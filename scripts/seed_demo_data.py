@@ -106,13 +106,18 @@ def build_demo_events():
 
 
 def main():
+    import sys
     import requests
 
     events = build_demo_events()
-    for event in events:
-        response = requests.post(f"{BASE_URL}/ingest", json=event)
-        response.raise_for_status()
-        print(f"ingested {event['event_type']} on {event['host']} -> id={response.json()['id']}")
+    try:
+        for event in events:
+            response = requests.post(f"{BASE_URL}/ingest", json=event)
+            response.raise_for_status()
+            print(f"ingested {event['event_type']} on {event['host']} -> id={response.json()['id']}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error: could not reach {BASE_URL} ({e}). Is the app running? Try `python run.py` first.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
