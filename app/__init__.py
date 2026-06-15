@@ -15,6 +15,8 @@ def create_app(config=None):
 
     db.init_app(app)
 
+    from app import models  # noqa: F401 - registers tables with SQLAlchemy
+
     with app.app_context():
         db.create_all()
 
