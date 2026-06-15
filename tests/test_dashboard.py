@@ -110,3 +110,47 @@ def test_update_alert_status(client):
 
     assert response.status_code == 302
     assert Alert.query.get(alert.id).status == "closed_tp"
+
+
+def test_update_alert_status_missing_status_field(client):
+    alert = Alert(
+        created_at=datetime(2026, 6, 15, 10, 1, 0),
+        rule_id="RULE-001",
+        title="SSH Brute Force",
+        severity="medium",
+        attack_technique="T1110",
+        attack_tactic="Credential Access",
+        host="linux-vm",
+        status="new",
+        triggering_event_ids=[],
+        details={},
+    )
+    db.session.add(alert)
+    db.session.commit()
+
+    response = client.post(f"/alerts/{alert.id}/status", data={})
+
+    assert response.status_code == 302
+    assert Alert.query.get(alert.id).status == "new"
+
+
+def test_update_alert_status_invalid_value(client):
+    alert = Alert(
+        created_at=datetime(2026, 6, 15, 10, 1, 0),
+        rule_id="RULE-001",
+        title="SSH Brute Force",
+        severity="medium",
+        attack_technique="T1110",
+        attack_tactic="Credential Access",
+        host="linux-vm",
+        status="new",
+        triggering_event_ids=[],
+        details={},
+    )
+    db.session.add(alert)
+    db.session.commit()
+
+    response = client.post(f"/alerts/{alert.id}/status", data={"status": "deleted"})
+
+    assert response.status_code == 302
+    assert Alert.query.get(alert.id).status == "new"
