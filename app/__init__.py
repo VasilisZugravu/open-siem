@@ -17,7 +17,9 @@ def create_app(config=None):
 
     from app import models  # noqa: F401 - registers tables with SQLAlchemy
     from app.ingest import ingest_bp
+    from app.dashboard.routes import dashboard_bp
     app.register_blueprint(ingest_bp)
+    app.register_blueprint(dashboard_bp)
 
     with app.app_context():
         db.create_all()
