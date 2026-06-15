@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from app.db import db
 from app.models import Alert, Event
 from app.detection import RULES_DIR
@@ -117,3 +117,29 @@ def event_explorer():
         selected_event_type=event_type or "",
         search=search or "",
     )
+
+
+@dashboard_bp.route("/api/alerts")
+def api_alerts():
+    rule_id = request.args.get("rule_id")
+    since = request.args.get("since")
+
+    query = Alert.query
+    if rule_id:
+        query = query.filter(Alert.rule_id == rule_id)
+    if since:
+        since_dt = datetime.fromisoformat(since)
+        query = query.filter(Alert.created_at >= since_dt)
+
+    alerts = query.order_by(Alert.created_at.desc()).all()
+    return jsonify([
+        {
+            "id": a.id,
+            "rule_id": a.rule_id,
+            "title": a.title,
+            "severity": a.severity,
+            "created_at": a.created_at.isoformat(),
+            "host": a.host,
+        }
+        for a in alerts
+    ])
