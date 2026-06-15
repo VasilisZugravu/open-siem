@@ -1,0 +1,14 @@
+id: RULE-005
+title: Office Application Spawned a Shell
+description: Word or Excel spawned cmd.exe or powershell.exe, a classic malicious-macro pattern
+severity: high
+attack_technique: T1059
+attack_tactic: Execution
+detection:
+  event_type: process_creation
+  conditions:
+    process_name:
+      in: ["cmd.exe", "powershell.exe"]
+    parent_process:
+      in: ["winword.exe", "excel.exe"]
+tags: [windows, execution, phishing]

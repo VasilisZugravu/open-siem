@@ -1,0 +1,12 @@
+id: RULE-007
+title: Possible LSASS Memory Dump
+description: A process command line referenced lsass, consistent with credential dumping tools like procdump
+severity: high
+attack_technique: T1003.001
+attack_tactic: Credential Access
+detection:
+  event_type: process_creation
+  conditions:
+    command_line:
+      contains: "lsass"
+tags: [windows, credential-access]

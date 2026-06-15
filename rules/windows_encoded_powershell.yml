@@ -1,0 +1,13 @@
+id: RULE-004
+title: Encoded PowerShell Command
+description: PowerShell was executed with a base64-encoded (-enc) command, a common obfuscation technique
+severity: high
+attack_technique: T1059.001
+attack_tactic: Execution
+detection:
+  event_type: process_creation
+  conditions:
+    process_name: powershell.exe
+    command_line:
+      contains: "-enc"
+tags: [windows, execution]

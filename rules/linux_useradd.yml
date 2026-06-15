@@ -1,0 +1,12 @@
+id: RULE-003
+title: New Local User Account Created
+description: A new local user account was created via useradd, a common persistence technique
+severity: medium
+attack_technique: T1136.001
+attack_tactic: Persistence
+detection:
+  event_type: command_execution
+  conditions:
+    command_line:
+      contains: "useradd"
+tags: [linux, persistence]
