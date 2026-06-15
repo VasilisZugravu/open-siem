@@ -74,3 +74,46 @@ def heatmap():
     rows.sort(key=lambda r: (r["tactic"], r["technique"]))
 
     return render_template("heatmap.html", rows=rows)
+
+
+@dashboard_bp.route("/events")
+def event_explorer():
+    query = Event.query
+
+    host = request.args.get("host")
+    event_type = request.args.get("event_type")
+    search = request.args.get("search")
+
+    if host:
+        query = query.filter(Event.host == host)
+    if event_type:
+        query = query.filter(Event.event_type == event_type)
+    if search:
+        query = query.filter(
+            db.or_(
+                Event.command_line.contains(search),
+                Event.raw.contains(search),
+            )
+        )
+
+    events = query.order_by(Event.timestamp.desc()).limit(100).all()
+
+    hosts_query = db.session.query(Event.host).distinct()
+    if event_type:
+        hosts_query = hosts_query.filter(Event.event_type == event_type)
+    hosts = sorted({row[0] for row in hosts_query.all()})
+
+    event_types_query = db.session.query(Event.event_type).distinct()
+    if host:
+        event_types_query = event_types_query.filter(Event.host == host)
+    event_types = sorted({row[0] for row in event_types_query.all()})
+
+    return render_template(
+        "event_explorer.html",
+        events=events,
+        hosts=hosts,
+        event_types=event_types,
+        selected_host=host or "",
+        selected_event_type=event_type or "",
+        search=search or "",
+    )

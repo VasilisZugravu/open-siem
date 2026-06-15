@@ -184,3 +184,62 @@ def test_heatmap_marks_fired_techniques(client):
 
     assert response.status_code == 200
     assert b"fired" in response.data
+
+
+def test_event_explorer_lists_events(client):
+    db.session.add(Event(
+        timestamp=datetime(2026, 6, 15, 10, 0, 0),
+        host="linux-vm",
+        event_type="auth_failure",
+        src_ip="203.0.113.50",
+        raw="Failed password for root from 203.0.113.50",
+    ))
+    db.session.commit()
+
+    response = client.get("/events")
+
+    assert response.status_code == 200
+    assert b"auth_failure" in response.data
+    assert b"203.0.113.50" in response.data
+
+
+def test_event_explorer_filters_by_host(client):
+    db.session.add(Event(
+        timestamp=datetime(2026, 6, 15, 10, 0, 0),
+        host="linux-vm",
+        event_type="auth_failure",
+    ))
+    db.session.add(Event(
+        timestamp=datetime(2026, 6, 15, 10, 1, 0),
+        host="win-vm",
+        event_type="process_creation",
+    ))
+    db.session.commit()
+
+    response = client.get("/events?host=win-vm")
+
+    assert response.status_code == 200
+    assert b"process_creation" in response.data
+    assert b"auth_failure" not in response.data
+
+
+def test_event_explorer_filters_by_search(client):
+    db.session.add(Event(
+        timestamp=datetime(2026, 6, 15, 10, 0, 0),
+        host="win-vm",
+        event_type="process_creation",
+        command_line="powershell.exe -enc abc123",
+    ))
+    db.session.add(Event(
+        timestamp=datetime(2026, 6, 15, 10, 1, 0),
+        host="win-vm",
+        event_type="process_creation",
+        command_line="cmd.exe /c dir",
+    ))
+    db.session.commit()
+
+    response = client.get("/events?search=-enc")
+
+    assert response.status_code == 200
+    assert b"-enc" in response.data
+    assert b"/c dir" not in response.data
