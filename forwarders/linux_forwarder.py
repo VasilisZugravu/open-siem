@@ -1,7 +1,23 @@
+import json
+import logging
 import os
 import re
 import socket
+import time
 from datetime import datetime
+
+import requests
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
+POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
+AUTH_LOG = os.environ.get("SIEM_AUTH_LOG", "/var/log/auth.log")
+STATE_FILE = os.environ.get(
+    "SIEM_STATE_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".linux_forwarder_state.json"),
+)
 
 HOST_LABEL = os.environ.get("SIEM_HOST_LABEL", socket.gethostname())
 
@@ -65,3 +81,56 @@ def parse_auth_log_line(line):
         }
 
     return None
+
+
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return {}
+    with open(STATE_FILE) as f:
+        return json.load(f)
+
+
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+
+def post_event(event):
+    try:
+        response = requests.post(f"{SIEM_URL}/ingest", json=event, timeout=5)
+        response.raise_for_status()
+        return True
+    except requests.exceptions.RequestException as exc:
+        logger.warning("failed to post event: %s", exc)
+        return False
+
+
+def main():
+    state = load_state()
+    if "offset" not in state:
+        state["offset"] = os.path.getsize(AUTH_LOG)
+        save_state(state)
+
+    while True:
+        current_size = os.path.getsize(AUTH_LOG)
+        if state["offset"] > current_size:
+            state["offset"] = 0
+
+        with open(AUTH_LOG) as f:
+            f.seek(state["offset"])
+            for line in f:
+                if not line.endswith("\n"):
+                    break
+                event = parse_auth_log_line(line.rstrip("\n"))
+                if event is not None:
+                    if not post_event(event):
+                        break
+                    logger.info("sent %s from %s", event["event_type"], event["host"])
+                state["offset"] = f.tell()
+                save_state(state)
+
+        time.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()
