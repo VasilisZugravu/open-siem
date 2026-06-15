@@ -118,7 +118,8 @@ def main():
 
         with open(AUTH_LOG) as f:
             f.seek(state["offset"])
-            for line in f:
+            while True:
+                line = f.readline()
                 if not line.endswith("\n"):
                     break
                 event = parse_auth_log_line(line.rstrip("\n"))
