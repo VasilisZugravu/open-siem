@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from app.db import db
 from app.models import Event, Alert, EngineState
 from app.detection.operators import match_conditions
@@ -70,3 +71,64 @@ def evaluate_single_event_rules(rules):
 
     state.last_processed_event_id = max_id
     db.session.commit()
+
+
+def evaluate_aggregation_rules(rules, now=None):
+    """Check rules with an aggregation block: group recent matching events by
+    `group_by` and fire an alert for any group that reaches `threshold` within
+    `timeframe_seconds`. A cooldown (the same timeframe) prevents re-firing for
+    a group that already has a recent alert."""
+    now = now or datetime.utcnow()
+
+    for rule in rules:
+        detection = rule["detection"]
+        if "aggregation" not in detection:
+            continue
+
+        agg = detection["aggregation"]
+        window_start = now - timedelta(seconds=agg["timeframe_seconds"])
+
+        candidates = Event.query.filter(
+            Event.event_type == detection["event_type"],
+            Event.timestamp >= window_start,
+        ).all()
+
+        conditions = detection.get("conditions", {})
+        matching = [e for e in candidates if match_conditions(event_to_dict(e), conditions)]
+
+        groups = {}
+        for event in matching:
+            group_value = event_to_dict(event).get(agg["group_by"])
+            groups.setdefault(group_value, []).append(event)
+
+        recent_alerts = Alert.query.filter(
+            Alert.rule_id == rule["id"],
+            Alert.created_at >= window_start,
+        ).all()
+        already_alerted = {a.details.get(agg["group_by"]) for a in recent_alerts}
+
+        for group_value, events in groups.items():
+            if len(events) < agg["threshold"]:
+                continue
+            if group_value in already_alerted:
+                continue
+
+            db.session.add(Alert(
+                rule_id=rule["id"],
+                title=rule["title"],
+                severity=rule["severity"],
+                attack_technique=rule["attack_technique"],
+                attack_tactic=rule["attack_tactic"],
+                host=events[-1].host,
+                status="new",
+                triggering_event_ids=[e.id for e in events],
+                details={agg["group_by"]: group_value, "count": len(events)},
+            ))
+
+    db.session.commit()
+
+
+def run_detection_cycle(rules):
+    """Run one full detection pass: single-event rules, then aggregation rules."""
+    evaluate_single_event_rules(rules)
+    evaluate_aggregation_rules(rules)
