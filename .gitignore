@@ -3,3 +3,10 @@ __pycache__/
 *.db
 .env
 venv/
+
+# graphify build output (regenerable, contains machine-specific paths)
+graphify-out/
+
+# local Claude Code settings and worktree checkouts
+.claude/settings.local.json
+.claude/worktrees/
