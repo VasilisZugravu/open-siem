@@ -18,8 +18,13 @@ def ingest_event():
         if field not in data:
             return jsonify({"error": f"missing required field: {field}"}), 400
 
+    try:
+        timestamp = datetime.fromisoformat(data["timestamp"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "invalid timestamp"}), 400
+
     event = Event(
-        timestamp=datetime.fromisoformat(data["timestamp"]),
+        timestamp=timestamp,
         host=data["host"],
         event_type=data["event_type"],
         user=data.get("user"),

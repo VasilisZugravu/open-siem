@@ -33,3 +33,14 @@ def test_ingest_invalid_json(client):
     response = client.post("/ingest", data="not json", content_type="application/json")
 
     assert response.status_code == 400
+
+
+def test_ingest_invalid_timestamp(client):
+    response = client.post("/ingest", json={
+        "timestamp": "not-a-date",
+        "host": "linux-vm",
+        "event_type": "auth_failure",
+    })
+
+    assert response.status_code == 400
+    assert "timestamp" in response.get_json()["error"]
