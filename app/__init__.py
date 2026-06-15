@@ -20,4 +20,8 @@ def create_app(config=None):
     with app.app_context():
         db.create_all()
 
+    if not app.config.get("TESTING"):
+        from app.scheduler import start_background_loop
+        start_background_loop(app)
+
     return app
