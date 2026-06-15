@@ -32,3 +32,10 @@ class Alert(db.Model):
     status = db.Column(db.String(16), nullable=False, default="new")
     triggering_event_ids = db.Column(db.JSON, nullable=False)
     details = db.Column(db.JSON, nullable=True)
+
+
+class EngineState(db.Model):
+    __tablename__ = "engine_state"
+
+    id = db.Column(db.Integer, primary_key=True)
+    last_processed_event_id = db.Column(db.Integer, nullable=False, default=0)
