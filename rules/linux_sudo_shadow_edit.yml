@@ -1,0 +1,12 @@
+id: RULE-002
+title: Sudo Used to Edit Shadow File or Run visudo
+description: A user invoked sudo to edit /etc/shadow or run visudo, a common privilege escalation step
+severity: high
+attack_technique: T1548.003
+attack_tactic: Privilege Escalation
+detection:
+  event_type: command_execution
+  conditions:
+    command_line:
+      regex: "(shadow|visudo)"
+tags: [linux, privilege-escalation]

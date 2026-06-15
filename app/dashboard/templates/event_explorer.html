@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Event Explorer{% endblock %}
+{% block content %}
+<h2>Event Explorer</h2>
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <select name="host" class="form-select">
+            <option value="">All hosts</option>
+            {% for h in hosts %}
+            <option value="{{ h }}" {% if h == selected_host %}selected{% endif %}>{{ h }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="event_type" class="form-select">
+            <option value="">All event types</option>
+            {% for et in event_types %}
+            <option value="{{ et }}" {% if et == selected_event_type %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <input type="text" name="search" class="form-control" placeholder="Search command/raw" value="{{ search }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+</form>
+<table class="table table-sm table-striped">
+    <thead>
+        <tr><th>Time</th><th>Host</th><th>Event Type</th><th>User</th><th>Source IP</th><th>Process</th><th>Command Line</th></tr>
+    </thead>
+    <tbody>
+        {% for event in events %}
+        <tr>
+            <td>{{ event.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>{{ event.host }}</td>
+            <td>{{ event.event_type }}</td>
+            <td>{{ event.user or "" }}</td>
+            <td>{{ event.src_ip or "" }}</td>
+            <td>{{ event.process_name or "" }}</td>
+            <td><code>{{ event.command_line or event.raw or "" }}</code></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

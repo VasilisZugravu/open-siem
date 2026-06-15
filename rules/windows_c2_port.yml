@@ -1,0 +1,12 @@
+id: RULE-008
+title: Outbound Connection to Known C2 Port
+description: A process made an outbound network connection to a port commonly used by C2 frameworks (e.g. Metasploit default 4444)
+severity: high
+attack_technique: T1071
+attack_tactic: Command and Control
+detection:
+  event_type: network_connection
+  conditions:
+    dest_port:
+      in: [4444, 4445]
+tags: [windows, c2]

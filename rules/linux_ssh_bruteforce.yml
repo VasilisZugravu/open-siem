@@ -1,0 +1,15 @@
+id: RULE-001
+title: SSH Brute Force
+description: Multiple failed SSH logins from the same source IP within 60 seconds
+severity: medium
+attack_technique: T1110
+attack_tactic: Credential Access
+detection:
+  event_type: auth_failure
+  conditions:
+    service: sshd
+  aggregation:
+    group_by: src_ip
+    threshold: 5
+    timeframe_seconds: 60
+tags: [linux, authentication]

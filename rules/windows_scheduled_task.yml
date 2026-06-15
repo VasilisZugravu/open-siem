@@ -1,0 +1,13 @@
+id: RULE-006
+title: Scheduled Task Created
+description: A scheduled task was created via schtasks.exe, often used for persistence
+severity: medium
+attack_technique: T1053.005
+attack_tactic: Persistence
+detection:
+  event_type: process_creation
+  conditions:
+    process_name: schtasks.exe
+    command_line:
+      contains: "/create"
+tags: [windows, persistence]

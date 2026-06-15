@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Alert Feed{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <canvas id="hourlyChart"></canvas>
+    </div>
+    <div class="col-md-6">
+        <canvas id="severityChart"></canvas>
+    </div>
+</div>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Severity</th>
+            <th>Title</th>
+            <th>ATT&amp;CK</th>
+            <th>Host</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for alert in alerts %}
+        <tr>
+            <td>{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>{{ alert.severity }}</td>
+            <td><a href="{{ url_for('dashboard.alert_detail', alert_id=alert.id) }}">{{ alert.title }}</a></td>
+            <td>{{ alert.attack_technique }}</td>
+            <td>{{ alert.host }}</td>
+            <td>{{ alert.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+{% block scripts %}
+<script>
+new Chart(document.getElementById('hourlyChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ hourly_labels | tojson }},
+        datasets: [{ label: 'Alerts per hour', data: {{ hourly_values | tojson }} }]
+    }
+});
+new Chart(document.getElementById('severityChart'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ severity_labels | tojson }},
+        datasets: [{ label: 'Alerts by severity', data: {{ severity_values | tojson }} }]
+    }
+});
+</script>
+{% endblock %}
