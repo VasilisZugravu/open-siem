@@ -1,7 +1,24 @@
+import json
+import logging
 import os
 import socket
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
+
+import requests
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
+POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
+STATE_FILE = os.environ.get(
+    "SIEM_STATE_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".windows_forwarder_state.json"),
+)
+
+SYSMON_CHANNEL = "Microsoft-Windows-Sysmon/Operational"
 
 HOST_LABEL = os.environ.get("SIEM_HOST_LABEL", socket.gethostname())
 
@@ -50,3 +67,84 @@ def map_sysmon_event(xml_string):
         }
 
     return None
+
+
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return {}
+    with open(STATE_FILE) as f:
+        return json.load(f)
+
+
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+
+def post_event(event):
+    try:
+        response = requests.post(f"{SIEM_URL}/ingest", json=event, timeout=5)
+        response.raise_for_status()
+        return True
+    except requests.exceptions.RequestException as exc:
+        logger.warning("failed to post event: %s", exc)
+        return False
+
+
+def _record_id(xml_string):
+    root = ET.fromstring(xml_string)
+    return int(root.find(f"{EVENT_NS}System/{EVENT_NS}EventRecordID").text)
+
+
+def _get_latest_record_id():
+    import win32evtlog
+
+    handle = win32evtlog.EvtQuery(
+        SYSMON_CHANNEL,
+        win32evtlog.EvtQueryChannelPath | win32evtlog.EvtQueryReverseDirection,
+    )
+    batch = win32evtlog.EvtNext(handle, 1)
+    if not batch:
+        return 0
+    xml_string = win32evtlog.EvtRender(batch[0], win32evtlog.EvtRenderEventXml)
+    return _record_id(xml_string)
+
+
+def _get_new_events(last_record_id):
+    import win32evtlog
+
+    query = f"*[System[EventRecordID > {last_record_id}]]"
+    handle = win32evtlog.EvtQuery(SYSMON_CHANNEL, win32evtlog.EvtQueryChannelPath, query)
+
+    events = []
+    while True:
+        batch = win32evtlog.EvtNext(handle, 10)
+        if not batch:
+            break
+        for raw_event in batch:
+            xml_string = win32evtlog.EvtRender(raw_event, win32evtlog.EvtRenderEventXml)
+            events.append((_record_id(xml_string), xml_string))
+    return events
+
+
+def main():
+    state = load_state()
+    if "last_record_id" not in state:
+        state["last_record_id"] = _get_latest_record_id()
+        save_state(state)
+
+    while True:
+        for record_id, xml_string in _get_new_events(state["last_record_id"]):
+            event = map_sysmon_event(xml_string)
+            if event is not None:
+                if not post_event(event):
+                    break
+                logger.info("sent %s from %s", event["event_type"], event["host"])
+            state["last_record_id"] = record_id
+            save_state(state)
+
+        time.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()
