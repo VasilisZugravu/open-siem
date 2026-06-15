@@ -154,3 +154,33 @@ def test_update_alert_status_invalid_value(client):
 
     assert response.status_code == 302
     assert Alert.query.get(alert.id).status == "new"
+
+
+def test_heatmap_lists_rules_grouped_by_tactic(client):
+    response = client.get("/heatmap")
+
+    assert response.status_code == 200
+    assert b"Credential Access" in response.data
+    assert b"T1110" in response.data
+    assert b"covered" in response.data
+
+
+def test_heatmap_marks_fired_techniques(client):
+    db.session.add(Alert(
+        created_at=datetime(2026, 6, 15, 10, 0, 0),
+        rule_id="RULE-001",
+        title="SSH Brute Force",
+        severity="medium",
+        attack_technique="T1110",
+        attack_tactic="Credential Access",
+        host="linux-vm",
+        status="new",
+        triggering_event_ids=[],
+        details={},
+    ))
+    db.session.commit()
+
+    response = client.get("/heatmap")
+
+    assert response.status_code == 200
+    assert b"fired" in response.data

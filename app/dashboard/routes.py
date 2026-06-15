@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for
 from app.db import db
 from app.models import Alert, Event
+from app.detection import RULES_DIR
+from app.detection.rules_loader import load_rules
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
 
@@ -51,3 +53,24 @@ def update_alert_status(alert_id):
         alert.status = new_status
         db.session.commit()
     return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
+
+
+@dashboard_bp.route("/heatmap")
+def heatmap():
+    rules = load_rules(RULES_DIR)
+    fired_techniques = {
+        row[0] for row in db.session.query(Alert.attack_technique).distinct().all()
+    }
+
+    rows = []
+    for rule in rules:
+        technique = rule["attack_technique"]
+        rows.append({
+            "tactic": rule["attack_tactic"],
+            "technique": technique,
+            "title": rule["title"],
+            "status": "fired" if technique in fired_techniques else "covered",
+        })
+    rows.sort(key=lambda r: (r["tactic"], r["technique"]))
+
+    return render_template("heatmap.html", rows=rows)

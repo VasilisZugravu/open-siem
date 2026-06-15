@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}ATT&amp;CK Heatmap{% endblock %}
+{% block content %}
+<h2>ATT&amp;CK Coverage Heatmap</h2>
+<p>
+    <span class="badge bg-success">covered</span> = rule exists, hasn't fired &nbsp;
+    <span class="badge bg-danger">fired</span> = rule exists and has triggered at least one alert
+</p>
+<table class="table table-bordered">
+    <thead>
+        <tr><th>Tactic</th><th>Technique</th><th>Rule</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr class="{{ 'table-danger' if row.status == 'fired' else 'table-success' }}">
+            <td>{{ row.tactic }}</td>
+            <td>{{ row.technique }}</td>
+            <td>{{ row.title }}</td>
+            <td>{{ row.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
