@@ -128,8 +128,11 @@ def api_alerts():
     if rule_id:
         query = query.filter(Alert.rule_id == rule_id)
     if since:
-        since_dt = datetime.fromisoformat(since)
-        query = query.filter(Alert.created_at >= since_dt)
+        try:
+            since_dt = datetime.fromisoformat(since)
+            query = query.filter(Alert.created_at >= since_dt)
+        except ValueError:
+            return jsonify({"error": "Invalid ISO 8601 format for 'since' parameter"}), 400
 
     alerts = query.order_by(Alert.created_at.desc()).all()
     return jsonify([

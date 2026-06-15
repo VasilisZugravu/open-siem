@@ -56,3 +56,10 @@ def test_api_alerts_returns_correct_fields(client):
     response = client.get("/api/alerts")
     data = json.loads(response.data)
     assert set(data[0].keys()) == {"id", "rule_id", "title", "severity", "created_at", "host"}
+
+
+def test_api_alerts_invalid_since_returns_400(client):
+    response = client.get("/api/alerts?since=not-a-date")
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert "error" in data
