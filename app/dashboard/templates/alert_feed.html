@@ -25,7 +25,7 @@
         <tr>
             <td>{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
             <td>{{ alert.severity }}</td>
-            <td>{{ alert.title }}</td>
+            <td><a href="{{ url_for('dashboard.alert_detail', alert_id=alert.id) }}">{{ alert.title }}</a></td>
             <td>{{ alert.attack_technique }}</td>
             <td>{{ alert.host }}</td>
             <td>{{ alert.status }}</td>

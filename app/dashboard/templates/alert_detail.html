@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Alert Detail{% endblock %}
+{% block content %}
+<h2>{{ alert.title }}</h2>
+<table class="table table-bordered w-auto">
+    <tr><th>Severity</th><td>{{ alert.severity }}</td></tr>
+    <tr><th>ATT&amp;CK Technique</th><td>{{ alert.attack_technique }}</td></tr>
+    <tr><th>ATT&amp;CK Tactic</th><td>{{ alert.attack_tactic }}</td></tr>
+    <tr><th>Host</th><td>{{ alert.host }}</td></tr>
+    <tr><th>Created</th><td>{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td></tr>
+    <tr><th>Details</th><td>{{ alert.details }}</td></tr>
+</table>
+
+<form method="post" action="{{ url_for('dashboard.update_alert_status', alert_id=alert.id) }}" class="mb-4">
+    <label for="status">Status:</label>
+    <select name="status" id="status">
+        {% for value, label in [("new", "New"), ("in_progress", "In Progress"), ("closed_tp", "Closed - True Positive"), ("closed_fp", "Closed - False Positive")] %}
+        <option value="{{ value }}" {% if alert.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">Update</button>
+</form>
+
+<h3>Triggering Events</h3>
+<table class="table table-sm">
+    <thead>
+        <tr><th>Time</th><th>Event Type</th><th>User</th><th>Source IP</th><th>Raw</th></tr>
+    </thead>
+    <tbody>
+        {% for event in events %}
+        <tr>
+            <td>{{ event.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>{{ event.event_type }}</td>
+            <td>{{ event.user or "" }}</td>
+            <td>{{ event.src_ip or "" }}</td>
+            <td><code>{{ event.raw or "" }}</code></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{{ url_for('dashboard.alert_feed') }}">&larr; Back to alerts</a>
+{% endblock %}
