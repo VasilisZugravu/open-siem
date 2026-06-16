@@ -21,6 +21,17 @@
     <button type="submit" class="btn btn-primary btn-sm">Update</button>
 </form>
 
+<form method="post" action="{{ url_for('dashboard.update_alert_notes', alert_id=alert.id) }}" class="mb-4">
+    <label for="notes" class="form-label">Analyst Notes</label>
+    <textarea name="notes" id="notes" class="form-control mb-2" rows="4" maxlength="2000">{{ alert.notes or "" }}</textarea>
+    <div class="d-flex align-items-center gap-3">
+        <button type="submit" class="btn btn-success btn-sm">Save Note</button>
+        {% if alert.notes_updated_at %}
+        <small class="text-muted">Last updated: {{ alert.notes_updated_at.strftime("%Y-%m-%d %H:%M") }}</small>
+        {% endif %}
+    </div>
+</form>
+
 <h3>Triggering Events</h3>
 <table class="table table-sm">
     <thead>

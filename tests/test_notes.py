@@ -95,3 +95,28 @@ def test_max_length_guard_rejects_note_over_2000_chars(logged_in_client, authed_
     db.session.expire_all()
     alert = Alert.query.get(alert_id)
     assert alert.notes == "initial"  # unchanged
+
+
+# ── GET / template rendering tests ───────────────────────────────────────────
+
+def test_detail_page_shows_saved_note(logged_in_client, alert_id):
+    logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "my findings"})
+    response = logged_in_client.get(f"/alerts/{alert_id}")
+    assert response.status_code == 200
+    assert b"my findings" in response.data
+
+
+def test_detail_page_shows_last_updated_when_note_saved(logged_in_client, alert_id):
+    logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "check"})
+    response = logged_in_client.get(f"/alerts/{alert_id}")
+    assert b"Last updated" in response.data
+
+
+def test_xss_note_is_html_escaped_in_template(logged_in_client, alert_id):
+    logged_in_client.post(
+        f"/alerts/{alert_id}/notes",
+        data={"notes": "<script>alert(1)</script>"},
+    )
+    response = logged_in_client.get(f"/alerts/{alert_id}")
+    assert b"<script>alert(1)</script>" not in response.data
+    assert b"&lt;script&gt;" in response.data
