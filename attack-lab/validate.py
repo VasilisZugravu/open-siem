@@ -4,6 +4,7 @@
 import argparse
 import datetime
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -25,14 +26,16 @@ POLL_INTERVAL = 5
 TIMEOUT = 60
 
 
-def _poll_alert(siem_url, rule_id, since_iso, timeout=TIMEOUT):
+def _poll_alert(siem_url, rule_id, since_iso, api_key=None, timeout=TIMEOUT):
     """Poll /api/alerts until an alert is found or timeout expires. Returns alert dict or None."""
     params = urllib.parse.urlencode({"rule_id": rule_id, "since": since_iso})
     url = f"{siem_url}/api/alerts?{params}"
+    headers = {"X-Api-Key": api_key} if api_key else {}
     deadline = time.time() + timeout
     while True:
         try:
-            with urllib.request.urlopen(url, timeout=5) as resp:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 alerts = json.loads(resp.read())
                 if alerts:
                     return alerts[0]
@@ -62,7 +65,7 @@ def _write_coverage_md(results, path):
         f.write("\n".join(lines) + "\n")
 
 
-def _run_scenario(siem_url, scenario):
+def _run_scenario(siem_url, scenario, api_key=None):
     """Prompt user to run script on VM, poll for alert. Returns '✅' or '❌'."""
     script = f"attack-lab/{scenario['folder']}/run.{scenario['ext']}"
     print(f"\n▶  Scenario {scenario['num']} — {scenario['name']} ({scenario['technique']})")
@@ -70,7 +73,7 @@ def _run_scenario(siem_url, scenario):
     since_iso = datetime.datetime.utcnow().isoformat()
     input("   Press Enter when the script has been run on the VM...")
     print(f"   Polling {scenario['rule']}...", end="", flush=True)
-    alert = _poll_alert(siem_url, scenario["rule"], since_iso)
+    alert = _poll_alert(siem_url, scenario["rule"], since_iso, api_key=api_key)
     if alert:
         print(f" ✅  (alert id={alert['id']})")
         return "✅"
@@ -82,6 +85,11 @@ def main():
     parser = argparse.ArgumentParser(description="Validate attack lab scenarios against the SIEM.")
     parser.add_argument("--siem", default="http://localhost:5000", help="SIEM base URL")
     parser.add_argument("--scenario", metavar="NUM", help="Run only this scenario number, e.g. 01")
+    parser.add_argument(
+        "--api-key",
+        default=os.environ.get("INGEST_API_KEY"),
+        help="X-Api-Key for /api/alerts (defaults to INGEST_API_KEY env var)",
+    )
     args = parser.parse_args()
 
     to_run = SCENARIOS
@@ -93,7 +101,7 @@ def main():
 
     results = {s["num"]: (s, "⏳") for s in SCENARIOS}
     for s in to_run:
-        results[s["num"]] = (s, _run_scenario(args.siem, s))
+        results[s["num"]] = (s, _run_scenario(args.siem, s, api_key=args.api_key))
 
     coverage_path = "attack-lab/COVERAGE.md"
     _write_coverage_md([results[n] for n in sorted(results)], coverage_path)
