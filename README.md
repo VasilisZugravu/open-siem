@@ -10,7 +10,7 @@ dashboard with an ATT&CK coverage heatmap.
 - **Mock IP enrichment**: deterministic geo/ASN annotation on `src_ip` at ingest — country and AS number shown in Event Explorer and alert detail
 - **Analyst triage**: per-alert status workflow (New → In Progress → Closed TP/FP) with timestamped analyst notes
 - **Alert deduplication**: status-gate prevents re-firing while an open alert for the same rule+host exists; aggregation and sequence rules use cooldown windows
-- **113 automated tests** covering unit, integration, and end-to-end detection chains
+- **122 automated tests** covering unit, integration, end-to-end detection chains, and false-positive (true-negative) validation
 
 ## Architecture
 
