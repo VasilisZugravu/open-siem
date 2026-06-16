@@ -16,6 +16,7 @@ class Event(db.Model):
     command_line = db.Column(db.Text, nullable=True)
     details = db.Column(db.JSON, nullable=True)
     raw = db.Column(db.Text, nullable=True)
+    enrichment = db.Column(db.JSON, nullable=True)
 
 
 class Alert(db.Model):

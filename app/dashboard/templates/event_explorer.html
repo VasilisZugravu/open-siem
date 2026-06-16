@@ -28,7 +28,7 @@
 </form>
 <table class="table table-sm table-striped">
     <thead>
-        <tr><th>Time</th><th>Host</th><th>Event Type</th><th>User</th><th>Source IP</th><th>Process</th><th>Command Line</th></tr>
+        <tr><th>Time</th><th>Host</th><th>Event Type</th><th>User</th><th>Source IP</th><th>Geo / ASN (mock)</th><th>Process</th><th>Command Line</th></tr>
     </thead>
     <tbody>
         {% for event in events %}
@@ -38,6 +38,13 @@
             <td>{{ event.event_type }}</td>
             <td>{{ event.user or "" }}</td>
             <td>{{ event.src_ip or "" }}</td>
+            <td>
+              {% if event.enrichment and not event.enrichment.is_private and event.enrichment.country %}
+                {{ event.enrichment.country }}{% if event.enrichment.asn %} · AS{{ event.enrichment.asn }}{% endif %}
+              {% elif event.enrichment and event.enrichment.is_private %}
+                <span class="text-muted">private</span>
+              {% endif %}
+            </td>
             <td>{{ event.process_name or "" }}</td>
             <td><code>{{ event.command_line or event.raw or "" }}</code></td>
         </tr>

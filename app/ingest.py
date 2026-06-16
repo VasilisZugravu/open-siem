@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Blueprint, current_app, request, jsonify
 from app.db import db
 from app.models import Event
+from app.enrichment import enrich_ip
 
 ingest_bp = Blueprint("ingest", __name__)
 
@@ -27,17 +28,19 @@ def ingest_event():
     except (ValueError, TypeError):
         return jsonify({"error": "invalid timestamp"}), 400
 
+    src_ip = data.get("src_ip")
     event = Event(
         timestamp=timestamp,
         host=data["host"],
         event_type=data["event_type"],
         user=data.get("user"),
-        src_ip=data.get("src_ip"),
+        src_ip=src_ip,
         dest_ip=data.get("dest_ip"),
         process_name=data.get("process_name"),
         command_line=data.get("command_line"),
         details=data.get("details"),
         raw=data.get("raw"),
+        enrichment=enrich_ip(src_ip),
     )
     db.session.add(event)
     db.session.commit()
