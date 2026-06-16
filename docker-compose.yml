@@ -14,6 +14,10 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://siem:siem@db:5432/siem
+      SECRET_KEY: change-me-in-production
+      DASHBOARD_USER: admin
+      DASHBOARD_PASSWORD: changeme
+      INGEST_API_KEY: changeme
     ports:
       - "5000:5000"
     depends_on:
