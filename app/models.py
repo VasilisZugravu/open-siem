@@ -32,6 +32,8 @@ class Alert(db.Model):
     status = db.Column(db.String(16), nullable=False, default="new")
     triggering_event_ids = db.Column(db.JSON, nullable=False)
     details = db.Column(db.JSON, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    notes_updated_at = db.Column(db.DateTime, nullable=True)
 
 
 class EngineState(db.Model):
