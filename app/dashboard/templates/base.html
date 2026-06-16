@@ -20,6 +20,18 @@
         </div>
     </nav>
     <div class="container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="container mt-2">
+          {% for message in messages %}
+          <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

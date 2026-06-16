@@ -27,7 +27,7 @@
     <div class="d-flex align-items-center gap-3">
         <button type="submit" class="btn btn-success btn-sm">Save Note</button>
         {% if alert.notes_updated_at %}
-        <small class="text-muted">Last updated: {{ alert.notes_updated_at.strftime("%Y-%m-%d %H:%M") }}</small>
+        <small class="text-muted">Last updated: {{ alert.notes_updated_at.strftime("%Y-%m-%d %H:%M:%S") }}</small>
         {% endif %}
     </div>
 </form>

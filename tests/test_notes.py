@@ -1,5 +1,4 @@
 import pytest
-from app import create_app
 from app.db import db
 from app.models import Alert
 
@@ -7,21 +6,7 @@ from app.models import Alert
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def authed_app():
-    app = create_app({
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-        "DASHBOARD_USER": "admin",
-        "DASHBOARD_PASSWORD": "secret",
-        "INGEST_API_KEY": "test-secret",
-        "SECRET_KEY": "test-secret-key",
-    })
-    with app.app_context():
-        yield app
-
-
-@pytest.fixture
-def authed_client(authed_app):
+def unauthed_client(authed_app):
     """Unauthenticated test client for the auth-enabled app."""
     return authed_app.test_client()
 
@@ -53,8 +38,8 @@ def alert_id(authed_app):
 
 # ── POST route tests ──────────────────────────────────────────────────────────
 
-def test_unauthenticated_post_redirects_to_login(authed_client, alert_id):
-    response = authed_client.post(f"/alerts/{alert_id}/notes", data={"notes": "hi"})
+def test_unauthenticated_post_redirects_to_login(unauthed_client, alert_id):
+    response = unauthed_client.post(f"/alerts/{alert_id}/notes", data={"notes": "hi"})
     assert response.status_code == 302
     assert "/login" in response.headers["Location"]
 

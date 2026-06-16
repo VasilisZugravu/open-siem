@@ -63,7 +63,9 @@ def update_alert_status(alert_id):
 @login_required
 def update_alert_notes(alert_id):
     alert = Alert.query.get_or_404(alert_id)
-    note = request.form.get("notes", "")
+    if "notes" not in request.form:
+        return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
+    note = request.form["notes"]
     if len(note) > 2000:
         flash("Note is too long. Maximum 2000 characters.")
         return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
