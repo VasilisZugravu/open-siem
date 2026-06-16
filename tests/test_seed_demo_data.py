@@ -4,16 +4,16 @@ from scripts.seed_demo_data import build_demo_events
 def test_build_demo_events_covers_all_scenarios():
     events = build_demo_events()
 
-    assert len(events) == 13
+    assert len(events) == 15
 
     event_types = {e["event_type"] for e in events}
     assert event_types == {
-        "auth_failure", "command_execution", "process_creation", "network_connection",
+        "auth_failure", "auth_success", "command_execution", "process_creation", "network_connection",
     }
 
     ssh_events = [e for e in events if e["event_type"] == "auth_failure"]
     assert len(ssh_events) == 6
-    assert all(e["src_ip"] == "203.0.113.50" for e in ssh_events)
+    assert all(e["src_ip"] == "45.155.205.233" for e in ssh_events)
 
     command_lines = " ".join(e.get("command_line", "") for e in events)
     assert "visudo" in command_lines        # RULE-002

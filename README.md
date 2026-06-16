@@ -82,6 +82,17 @@ fire a `critical` Persistence alert.
 - `/events` — Event explorer: filter raw ingested events by host, event type,
   or free-text search; shows mock country · AS for public source IPs
 
+## Screenshots
+
+> Capture after running the app and seeding demo data (`python scripts/seed_demo_data.py`).
+
+| View | File |
+|------|------|
+| Alert feed + severity charts | `docs/img/alert-feed.png` |
+| ATT&CK coverage heatmap | `docs/img/heatmap.png` |
+| Event Explorer with geo/ASN | `docs/img/event-explorer.png` |
+| Alert detail with analyst notes | `docs/img/alert-detail.png` |
+
 ## Detection coverage
 
 | # | Scenario | Rule ID | ATT&CK Technique | Tactic | Rule Type |

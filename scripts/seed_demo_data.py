@@ -4,7 +4,7 @@ BASE_URL = "http://localhost:5000"
 
 
 def build_demo_events():
-    """Build 13 synthetic events covering all 8 attack lab scenarios / detection rules."""
+    """Build 15 synthetic events covering all 9 detection rules."""
     now = datetime.utcnow()
     events = []
 
@@ -15,9 +15,9 @@ def build_demo_events():
             "host": "linux-vm",
             "event_type": "auth_failure",
             "user": "root",
-            "src_ip": "203.0.113.50",
+            "src_ip": "45.155.205.233",
             "details": {"service": "sshd"},
-            "raw": "Failed password for root from 203.0.113.50 port 51234 ssh2",
+            "raw": "Failed password for root from 45.155.205.233 port 51234 ssh2",
         })
 
     # Scenario 2 (RULE-002, T1548.003): sudo visudo
@@ -100,6 +100,26 @@ def build_demo_events():
         "dest_ip": "198.51.100.23",
         "details": {"dest_port": 4444},
         "raw": "Sysmon Event ID 3: Network Connection",
+    })
+
+    # Scenario 9 (RULE-009, T1136.001): auth_success followed by useradd on same host within 10 min
+    events.append({
+        "timestamp": now.isoformat(),
+        "host": "linux-vm",
+        "event_type": "auth_success",
+        "user": "attacker",
+        "src_ip": "45.155.205.233",
+        "details": {"service": "sshd"},
+        "raw": "Accepted password for attacker from 45.155.205.233 port 51234 ssh2",
+    })
+    events.append({
+        "timestamp": (now + timedelta(seconds=10)).isoformat(),
+        "host": "linux-vm",
+        "event_type": "command_execution",
+        "user": "attacker",
+        "command_line": "useradd -m backdoor2",
+        "details": {},
+        "raw": "attacker : TTY=pts/1 ; PWD=/home/attacker ; USER=root ; COMMAND=/usr/sbin/useradd -m backdoor2",
     })
 
     return events
