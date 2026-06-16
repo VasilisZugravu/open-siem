@@ -71,6 +71,40 @@ For the sequence rule (RULE-009), seed an `auth_success` followed by a
 `useradd` event on the same host within 10 minutes — the detection cycle will
 fire a `critical` Persistence alert.
 
+## Attack Lab
+
+Nine attack simulation scripts (bash for Linux, PowerShell for Windows) each
+target one detection rule and generate real telemetry through the forwarders.
+See **[attack-lab/README.md](attack-lab/README.md)** for full setup instructions.
+
+### Forwarder setup (quick reference)
+
+**Linux VM** — tails `/var/log/auth.log` and the sudo audit log:
+
+```bash
+export SIEM_URL="http://<siem-ip>:5000"
+python forwarders/linux_forwarder.py
+```
+
+**Windows VM** — reads Sysmon Event ID 1 (process creation) and Event ID 3
+(network connection) from the Windows Event Log. Requires Sysmon installed and
+`pywin32`:
+
+```powershell
+pip install -r forwarders/requirements-windows.txt
+$env:SIEM_URL = "http://<siem-ip>:5000"
+python forwarders/windows_forwarder.py
+```
+
+After running scenarios on the VMs, validate detection coverage:
+
+```bash
+python attack-lab/validate.py --siem http://<siem-ip>:5000
+```
+
+This polls `/api/alerts` for each rule and writes results to
+[attack-lab/COVERAGE.md](attack-lab/COVERAGE.md).
+
 ## Dashboard
 
 - `/` — Alert feed: overview charts (alerts per hour, alerts by severity) plus
