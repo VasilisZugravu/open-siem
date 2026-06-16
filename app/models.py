@@ -36,6 +36,10 @@ class Alert(db.Model):
     notes = db.Column(db.Text, nullable=True)
     notes_updated_at = db.Column(db.DateTime, nullable=True)
 
+    __table_args__ = (
+        db.Index("ix_alert_rule_host_status", "rule_id", "host", "status"),
+    )
+
 
 class EngineState(db.Model):
     __tablename__ = "engine_state"

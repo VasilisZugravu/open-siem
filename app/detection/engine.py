@@ -59,6 +59,14 @@ def evaluate_single_event_rules(rules):
             if not match_conditions(event_dict, detection.get("conditions", {})):
                 continue
 
+            open_exists = Alert.query.filter(
+                Alert.rule_id == rule["id"],
+                Alert.host == event_dict.get("host"),
+                Alert.status.in_(["new", "in_progress"]),
+            ).first()
+            if open_exists:
+                continue
+
             db.session.add(Alert(
                 rule_id=rule["id"],
                 title=rule["title"],

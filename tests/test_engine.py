@@ -151,3 +151,82 @@ def test_aggregation_rule_groups_by_field_separately(app):
     alerts = Alert.query.all()
     src_ips = {a.details["src_ip"] for a in alerts}
     assert src_ips == {"203.0.113.50", "198.51.100.7"}
+
+
+def test_single_event_rule_does_not_fire_duplicate_if_open_alert_exists(app):
+    """Status-gate: skip firing if a 'new' alert already exists for same rule+host."""
+    from datetime import datetime
+    from app.db import db
+    from app.models import Alert, Event
+    from app.detection.engine import evaluate_single_event_rules
+
+    rule = {
+        "id": "RULE-DUP",
+        "title": "Dup Test",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "event_type": "lsass_access",
+            "conditions": {},
+        },
+    }
+
+    # Seed an existing open alert for same rule+host
+    existing = Alert(
+        rule_id="RULE-DUP", title="Dup Test", severity="high",
+        attack_technique="T9999", attack_tactic="Testing",
+        host="win-vm", status="new",
+        triggering_event_ids=[], details={},
+    )
+    db.session.add(existing)
+    db.session.commit()
+
+    # Seed a matching event
+    e = Event(timestamp=datetime.utcnow(), host="win-vm", event_type="lsass_access")
+    db.session.add(e)
+    db.session.commit()
+
+    evaluate_single_event_rules([rule])
+
+    db.session.expire_all()
+    assert Alert.query.count() == 1  # no new alert created
+
+
+def test_single_event_rule_fires_again_after_alert_closed(app):
+    """Status-gate allows re-firing once the existing alert is closed."""
+    from datetime import datetime
+    from app.db import db
+    from app.models import Alert, Event
+    from app.detection.engine import evaluate_single_event_rules
+
+    rule = {
+        "id": "RULE-DUP2",
+        "title": "Dup Test 2",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "event_type": "lsass_access",
+            "conditions": {},
+        },
+    }
+
+    # Existing alert is closed_tp — gate should not block
+    closed = Alert(
+        rule_id="RULE-DUP2", title="Dup Test 2", severity="high",
+        attack_technique="T9999", attack_tactic="Testing",
+        host="win-vm", status="closed_tp",
+        triggering_event_ids=[], details={},
+    )
+    db.session.add(closed)
+    db.session.commit()
+
+    e = Event(timestamp=datetime.utcnow(), host="win-vm", event_type="lsass_access")
+    db.session.add(e)
+    db.session.commit()
+
+    evaluate_single_event_rules([rule])
+
+    db.session.expire_all()
+    assert Alert.query.count() == 2  # new alert fired despite closed existing
