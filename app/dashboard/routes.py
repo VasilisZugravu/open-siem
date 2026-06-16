@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app
+from flask_login import login_required, login_user, logout_user
 from app.db import db
 from app.models import Alert, Event
 from app.detection import RULES_DIR
@@ -9,6 +10,7 @@ dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
 
 
 @dashboard_bp.route("/")
+@login_required
 def alert_feed():
     alerts = Alert.query.order_by(Alert.created_at.desc()).limit(50).all()
 
@@ -37,6 +39,7 @@ def alert_feed():
 
 
 @dashboard_bp.route("/alerts/<int:alert_id>")
+@login_required
 def alert_detail(alert_id):
     alert = Alert.query.get_or_404(alert_id)
     events = []
@@ -46,6 +49,7 @@ def alert_detail(alert_id):
 
 
 @dashboard_bp.route("/alerts/<int:alert_id>/status", methods=["POST"])
+@login_required
 def update_alert_status(alert_id):
     alert = Alert.query.get_or_404(alert_id)
     new_status = request.form.get("status")
@@ -56,6 +60,7 @@ def update_alert_status(alert_id):
 
 
 @dashboard_bp.route("/heatmap")
+@login_required
 def heatmap():
     rules = load_rules(RULES_DIR)
     fired_techniques = {
@@ -77,6 +82,7 @@ def heatmap():
 
 
 @dashboard_bp.route("/events")
+@login_required
 def event_explorer():
     query = Event.query
 
@@ -117,6 +123,29 @@ def event_explorer():
         selected_event_type=event_type or "",
         search=search or "",
     )
+
+
+@dashboard_bp.route("/login", methods=["GET", "POST"])
+def login():
+    if not current_app.config.get("DASHBOARD_PASSWORD"):
+        return redirect(url_for("dashboard.alert_feed"))
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        if (username == current_app.config.get("DASHBOARD_USER", "admin")
+                and password == current_app.config["DASHBOARD_PASSWORD"]):
+            from app.auth import _admin
+            login_user(_admin)
+            next_page = request.args.get("next") or url_for("dashboard.alert_feed")
+            return redirect(next_page)
+        flash("Invalid username or password.")
+    return render_template("login.html")
+
+
+@dashboard_bp.route("/logout")
+def logout():
+    logout_user()
+    return redirect(url_for("dashboard.login"))
 
 
 # dashboard_bp has no url_prefix (registered at "/") — /api/alerts lives here intentionally.

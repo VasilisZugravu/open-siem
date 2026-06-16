@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Sign in — SIEM{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-sm-8 col-md-5 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h5 class="card-title mb-1">Sign in</h5>
+        <p class="text-muted small mb-4">SOC Dashboard</p>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="alert alert-danger py-2 small">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label small fw-medium">Username</label>
+            <input name="username" type="text" class="form-control" autofocus>
+          </div>
+          <div class="mb-4">
+            <label class="form-label small fw-medium">Password</label>
+            <input name="password" type="password" class="form-control">
+          </div>
+          <button type="submit" class="btn btn-dark w-100">Sign in</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
