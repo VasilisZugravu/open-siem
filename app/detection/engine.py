@@ -130,7 +130,84 @@ def evaluate_aggregation_rules(rules, now=None):
     db.session.commit()
 
 
+def evaluate_sequence_rules(rules, now=None):
+    """Fire an alert when a step-1 event is followed by a step-2 event on the same
+    correlated field within timeframe_seconds. Only two-step sequences supported."""
+    now = now or datetime.utcnow()
+
+    for rule in rules:
+        detection = rule["detection"]
+        if "sequence" not in detection:
+            continue
+
+        steps = detection["sequence"]
+        correlate_by = detection["correlate_by"]
+        window = timedelta(seconds=detection["timeframe_seconds"])
+        step1, step2 = steps[0], steps[1]
+
+        candidates1 = (
+            Event.query
+            .filter(
+                Event.event_type == step1["event_type"],
+                Event.timestamp >= now - window,
+            )
+            .order_by(Event.timestamp)
+            .all()
+        )
+        step1_matching = [
+            e for e in candidates1
+            if match_conditions(event_to_dict(e), step1.get("conditions", {}))
+        ]
+
+        recent_alerts = Alert.query.filter(
+            Alert.rule_id == rule["id"],
+            Alert.created_at >= now - window,
+        ).all()
+        already_alerted = {a.details.get(correlate_by) for a in recent_alerts}
+
+        for e1 in step1_matching:
+            corr_val = event_to_dict(e1).get(correlate_by)
+            if corr_val in already_alerted:
+                continue
+
+            candidates2 = (
+                Event.query
+                .filter(
+                    Event.event_type == step2["event_type"],
+                    Event.timestamp > e1.timestamp,
+                    Event.timestamp <= e1.timestamp + window,
+                )
+                .order_by(Event.timestamp)
+                .all()
+            )
+            step2_matching = [
+                e for e in candidates2
+                if event_to_dict(e).get(correlate_by) == corr_val
+                and match_conditions(event_to_dict(e), step2.get("conditions", {}))
+            ]
+
+            if not step2_matching:
+                continue
+
+            e2 = step2_matching[0]
+            db.session.add(Alert(
+                rule_id=rule["id"],
+                title=rule["title"],
+                severity=rule["severity"],
+                attack_technique=rule["attack_technique"],
+                attack_tactic=rule["attack_tactic"],
+                host=e1.host,
+                status="new",
+                triggering_event_ids=[e1.id, e2.id],
+                details={correlate_by: corr_val, "step1_event": e1.id, "step2_event": e2.id},
+            ))
+            already_alerted.add(corr_val)
+
+    db.session.commit()
+
+
 def run_detection_cycle(rules):
-    """Run one full detection pass: single-event rules, then aggregation rules."""
+    """Run one full detection pass: single-event rules, aggregation rules, then sequence rules."""
     evaluate_single_event_rules(rules)
     evaluate_aggregation_rules(rules)
+    evaluate_sequence_rules(rules)
