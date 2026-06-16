@@ -119,6 +119,8 @@ def event_explorer():
     )
 
 
+# dashboard_bp has no url_prefix (registered at "/") — /api/alerts lives here intentionally.
+# If a url_prefix is ever added, update validate.py's --siem URL accordingly.
 @dashboard_bp.route("/api/alerts")
 def api_alerts():
     rule_id = request.args.get("rule_id")
