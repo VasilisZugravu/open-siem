@@ -20,6 +20,7 @@ SCENARIOS = [
     {"num": "06", "name": "Scheduled Task",     "folder": "06-scheduled-task",     "ext": "ps1", "vm": "Windows", "rule": "RULE-006", "technique": "T1053.005"},
     {"num": "07", "name": "LSASS Memory Dump",  "folder": "07-procdump-lsass",     "ext": "ps1", "vm": "Windows", "rule": "RULE-007", "technique": "T1003.001"},
     {"num": "08", "name": "C2 Port Connection", "folder": "08-c2-port",            "ext": "ps1", "vm": "Windows", "rule": "RULE-008", "technique": "T1071"},
+    {"num": "09", "name": "Brute Then Persist", "folder": "09-brute-then-persist", "ext": "sh",  "vm": "Linux",   "rule": "RULE-009", "technique": "T1136.001"},
 ]
 
 POLL_INTERVAL = 5
