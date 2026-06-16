@@ -152,6 +152,10 @@ def logout():
 # If a url_prefix is ever added, update validate.py's --siem URL accordingly.
 @dashboard_bp.route("/api/alerts")
 def api_alerts():
+    expected_key = current_app.config.get("INGEST_API_KEY")
+    if expected_key and request.headers.get("X-Api-Key") != expected_key:
+        return jsonify({"error": "unauthorized"}), 401
+
     rule_id = request.args.get("rule_id")
     since = request.args.get("since")
 

@@ -93,3 +93,23 @@ def test_login_when_auth_disabled_redirects_to_feed(client):
     response = client.get("/login", follow_redirects=False)
     assert response.status_code == 302
     assert response.headers["Location"] == "/"
+
+
+# ── /api/alerts key guard ────────────────────────────────────────────────────
+
+def test_api_alerts_requires_key_when_configured(authed_client):
+    response = authed_client.get("/api/alerts")
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "unauthorized"
+
+
+def test_api_alerts_with_correct_key_returns_200(authed_client):
+    response = authed_client.get("/api/alerts", headers={"X-Api-Key": "test-secret"})
+    assert response.status_code == 200
+    assert isinstance(response.get_json(), list)
+
+
+def test_api_alerts_no_key_configured_allows_through(client):
+    """When INGEST_API_KEY is not set, /api/alerts is open (existing behaviour)."""
+    response = client.get("/api/alerts")
+    assert response.status_code == 200
