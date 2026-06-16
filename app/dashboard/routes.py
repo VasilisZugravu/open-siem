@@ -59,6 +59,20 @@ def update_alert_status(alert_id):
     return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
 
 
+@dashboard_bp.route("/alerts/<int:alert_id>/notes", methods=["POST"])
+@login_required
+def update_alert_notes(alert_id):
+    alert = Alert.query.get_or_404(alert_id)
+    note = request.form.get("notes", "")
+    if len(note) > 2000:
+        flash("Note is too long. Maximum 2000 characters.")
+        return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
+    alert.notes = note
+    alert.notes_updated_at = datetime.utcnow()
+    db.session.commit()
+    return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
+
+
 @dashboard_bp.route("/heatmap")
 @login_required
 def heatmap():
