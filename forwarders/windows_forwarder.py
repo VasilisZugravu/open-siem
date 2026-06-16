@@ -12,6 +12,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
+SIEM_API_KEY = os.environ.get("SIEM_API_KEY", "")
 POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
 STATE_FILE = os.environ.get(
     "SIEM_STATE_FILE",
@@ -83,7 +84,8 @@ def save_state(state):
 
 def post_event(event):
     try:
-        response = requests.post(f"{SIEM_URL}/ingest", json=event, timeout=5)
+        headers = {"X-Api-Key": SIEM_API_KEY} if SIEM_API_KEY else {}
+        response = requests.post(f"{SIEM_URL}/ingest", json=event, headers=headers, timeout=5)
         response.raise_for_status()
         return True
     except requests.exceptions.RequestException as exc:

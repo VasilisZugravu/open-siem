@@ -10,3 +10,7 @@ graphify-out/
 # local Claude Code settings and worktree checkouts
 .claude/settings.local.json
 .claude/worktrees/
+.claude/council-cache/
+
+# superpowers brainstorming session files
+.superpowers/

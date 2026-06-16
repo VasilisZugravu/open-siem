@@ -1,4 +1,17 @@
+import pytest
+from app import create_app
 from app.models import Event
+
+
+@pytest.fixture
+def authed_client():
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "TESTING": True,
+        "INGEST_API_KEY": "test-secret",
+    })
+    with app.app_context():
+        yield app.test_client()
 
 
 def test_ingest_valid_event(client):
@@ -44,3 +57,28 @@ def test_ingest_invalid_timestamp(client):
 
     assert response.status_code == 400
     assert "timestamp" in response.get_json()["error"]
+
+
+def test_ingest_rejects_missing_key(authed_client):
+    response = authed_client.post("/ingest", json={
+        "timestamp": "2026-06-16T10:00:00",
+        "host": "linux-vm",
+        "event_type": "auth_failure",
+    })
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "unauthorized"
+
+
+def test_ingest_accepts_correct_key(authed_client):
+    response = authed_client.post(
+        "/ingest",
+        json={
+            "timestamp": "2026-06-16T10:00:00",
+            "host": "linux-vm",
+            "event_type": "auth_failure",
+        },
+        headers={"X-Api-Key": "test-secret"},
+    )
+
+    assert response.status_code == 201

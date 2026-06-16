@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 from app.db import db
 from app.models import Event
 
@@ -10,6 +10,10 @@ REQUIRED_FIELDS = ["timestamp", "host", "event_type"]
 
 @ingest_bp.route("/ingest", methods=["POST"])
 def ingest_event():
+    expected_key = current_app.config.get("INGEST_API_KEY")
+    if expected_key and request.headers.get("X-Api-Key") != expected_key:
+        return jsonify({"error": "unauthorized"}), 401
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "invalid JSON body"}), 400
