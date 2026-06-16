@@ -141,6 +141,8 @@ def evaluate_sequence_rules(rules, now=None):
             continue
 
         steps = detection["sequence"]
+        if len(steps) != 2:
+            raise ValueError(f"Rule {rule['id']}: only two-step sequences are supported")
         correlate_by = detection["correlate_by"]
         window = timedelta(seconds=detection["timeframe_seconds"])
         step1, step2 = steps[0], steps[1]
@@ -208,6 +210,7 @@ def evaluate_sequence_rules(rules, now=None):
 
 def run_detection_cycle(rules):
     """Run one full detection pass: single-event rules, aggregation rules, then sequence rules."""
+    now = datetime.utcnow()
     evaluate_single_event_rules(rules)
-    evaluate_aggregation_rules(rules)
-    evaluate_sequence_rules(rules)
+    evaluate_aggregation_rules(rules, now=now)
+    evaluate_sequence_rules(rules, now=now)
