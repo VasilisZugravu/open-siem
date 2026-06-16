@@ -52,6 +52,8 @@ def evaluate_single_event_rules(rules):
             detection = rule["detection"]
             if "aggregation" in detection:
                 continue
+            if "sequence" in detection:
+                continue
             if event_dict["event_type"] != detection["event_type"]:
                 continue
             if not match_conditions(event_dict, detection.get("conditions", {})):

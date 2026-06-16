@@ -12,8 +12,8 @@ def load_rule_file(path):
         if field not in rule:
             raise ValueError(f"Rule {path} missing required field: {field}")
 
-    if "event_type" not in rule["detection"]:
-        raise ValueError(f"Rule {path} detection block missing event_type")
+    if "sequence" not in rule["detection"] and "event_type" not in rule["detection"]:
+        raise ValueError(f"Rule {path} detection block missing event_type or sequence")
 
     return rule
 

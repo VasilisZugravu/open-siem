@@ -1,0 +1,17 @@
+id: RULE-009
+title: Brute Force Followed by Account Creation
+description: >
+  SSH login success followed by useradd on the same host within 10 minutes —
+  pattern consistent with a brute-force compromise leading to persistence.
+severity: critical
+attack_technique: T1110.001
+attack_tactic: Persistence
+detection:
+  sequence:
+    - event_type: auth_success
+      conditions: {}
+    - event_type: useradd
+      conditions: {}
+  correlate_by: host
+  timeframe_seconds: 600
+tags: [linux, persistence]
