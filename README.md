@@ -84,14 +84,21 @@ fire a `critical` Persistence alert.
 
 ## Screenshots
 
-> Capture after running the app and seeding demo data (`python scripts/seed_demo_data.py`).
+**Alert feed** — bar chart (alerts/hour) + severity donut + sortable alert table
 
-| View | File |
-|------|------|
-| Alert feed + severity charts | `docs/img/alert-feed.png` |
-| ATT&CK coverage heatmap | `docs/img/heatmap.png` |
-| Event Explorer with geo/ASN | `docs/img/event-explorer.png` |
-| Alert detail with analyst notes | `docs/img/alert-detail.png` |
+![Alert feed](docs/img/alert-feed.png)
+
+**ATT&CK Coverage Heatmap** — every rule fired across 5 tactics
+
+![ATT&CK heatmap](docs/img/heatmap.png)
+
+**Event Explorer** — filterable event table with mock geo/ASN enrichment
+
+![Event explorer](docs/img/event-explorer.png)
+
+**Alert detail** — RULE-009 two-step correlation showing both triggering events
+
+![Alert detail](docs/img/alert-detail.png)
 
 ## Detection coverage
 
