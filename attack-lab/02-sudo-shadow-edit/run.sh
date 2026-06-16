@@ -6,5 +6,5 @@
 set -euo pipefail
 
 echo "[02] Running sudo grep against /etc/shadow..."
-sudo grep root /etc/shadow > /dev/null
+sudo grep root /etc/shadow > /dev/null || true
 echo "[02] Done."
