@@ -9,6 +9,10 @@ def create_app(config=None):
         "DATABASE_URL", "sqlite:///siem.db"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["INGEST_API_KEY"] = os.environ.get("INGEST_API_KEY")
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    app.config["DASHBOARD_USER"] = os.environ.get("DASHBOARD_USER", "admin")
+    app.config["DASHBOARD_PASSWORD"] = os.environ.get("DASHBOARD_PASSWORD")
 
     if config:
         app.config.update(config)
@@ -18,8 +22,11 @@ def create_app(config=None):
     from app import models  # noqa: F401 - registers tables with SQLAlchemy
     from app.ingest import ingest_bp
     from app.dashboard.routes import dashboard_bp
+    from app.auth import init_auth
+
     app.register_blueprint(ingest_bp)
     app.register_blueprint(dashboard_bp)
+    init_auth(app)
 
     with app.app_context():
         db.create_all()
