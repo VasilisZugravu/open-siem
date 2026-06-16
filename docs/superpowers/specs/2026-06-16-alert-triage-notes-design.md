@@ -35,6 +35,7 @@ POST /alerts/<int:alert_id>/notes
 
 - Protected by `@login_required`
 - Reads `request.form["notes"]`
+- Rejects notes longer than 2000 characters: flashes an error and redirects back (no DB write)
 - Sets `alert.notes` and `alert.notes_updated_at = datetime.utcnow()`
 - Commits and redirects to `dashboard.alert_detail`
 
@@ -47,7 +48,7 @@ One insertion in `app/dashboard/templates/alert_detail.html`, between the status
 ```html
 <form method="post" action="{{ url_for('dashboard.update_alert_notes', alert_id=alert.id) }}" class="mb-4">
     <label for="notes" class="form-label">Analyst Notes</label>
-    <textarea name="notes" id="notes" class="form-control mb-2" rows="4">{{ alert.notes or "" }}</textarea>
+    <textarea name="notes" id="notes" class="form-control mb-2" rows="4" maxlength="2000">{{ alert.notes or "" }}</textarea>
     <div class="d-flex align-items-center gap-3">
         <button type="submit" class="btn btn-success btn-sm">Save Note</button>
         {% if alert.notes_updated_at %}
@@ -71,6 +72,8 @@ New file `tests/test_notes.py`. Uses the same `authed_client` fixture pattern as
 | 4 | Save empty note | POST `notes=""` → `alert.notes == ""`, `notes_updated_at` set |
 | 5 | Detail page shows note | `GET /alerts/<id>` with saved note → response body contains note text |
 | 6 | Detail page shows timestamp | Response contains "Last updated" when `notes_updated_at` is set |
+| 7 | Max-length guard | POST `notes` with 2001-char string → 302 redirect, `alert.notes` unchanged, flash message present |
+| 8 | XSS render safety | Save `notes="<script>alert(1)</script>"` → GET detail response contains `&lt;script&gt;` (Jinja2 auto-escape), not the raw tag |
 
 Existing tests are unaffected — the new columns are nullable, so no existing fixtures break.
 
