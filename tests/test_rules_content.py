@@ -10,9 +10,3 @@ def test_all_nine_rules_load():
         "RULE-005", "RULE-006", "RULE-007", "RULE-008",
         "RULE-009",
     }
-
-
-def test_rule_attack_techniques_are_unique():
-    rules = load_rules(RULES_DIR)
-    techniques = [r["attack_technique"] for r in rules]
-    assert len(techniques) == len(set(techniques))

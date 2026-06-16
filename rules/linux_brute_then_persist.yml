@@ -4,7 +4,7 @@ description: >
   SSH login success followed by useradd on the same host within 10 minutes —
   pattern consistent with a brute-force compromise leading to persistence.
 severity: critical
-attack_technique: T1110.001
+attack_technique: T1136.001
 attack_tactic: Persistence
 detection:
   sequence:
