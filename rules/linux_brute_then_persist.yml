@@ -10,8 +10,10 @@ detection:
   sequence:
     - event_type: auth_success
       conditions: {}
-    - event_type: useradd
-      conditions: {}
+    - event_type: command_execution
+      conditions:
+        command_line:
+          contains: "useradd"
   correlate_by: host
   timeframe_seconds: 600
 tags: [linux, persistence]

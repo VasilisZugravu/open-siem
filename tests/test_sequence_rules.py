@@ -124,7 +124,7 @@ def test_sequence_rule_fires_via_run_one_cycle(app, monkeypatch, tmp_path):
         "detection": {
             "sequence": [
                 {"event_type": "auth_success", "conditions": {}},
-                {"event_type": "useradd", "conditions": {}},
+                {"event_type": "command_execution", "conditions": {"command_line": {"contains": "useradd"}}},
             ],
             "correlate_by": "host",
             "timeframe_seconds": 600,
@@ -134,7 +134,14 @@ def test_sequence_rule_fires_via_run_one_cycle(app, monkeypatch, tmp_path):
     monkeypatch.setattr("app.scheduler.RULES_DIR", str(tmp_path))
 
     _event("linux-vm", "auth_success", datetime.utcnow() - timedelta(seconds=30))
-    _event("linux-vm", "useradd",      datetime.utcnow())
+    e = Event(
+        timestamp=datetime.utcnow(),
+        host="linux-vm",
+        event_type="command_execution",
+        command_line="useradd -m backdoor",
+    )
+    db.session.add(e)
+    db.session.commit()
 
     run_one_cycle(app)
 

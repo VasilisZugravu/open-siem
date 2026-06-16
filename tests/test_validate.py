@@ -24,7 +24,7 @@ def test_write_coverage_md_all_passing(tmp_path):
     assert "✅" in content
     assert "RULE-001" in content
     assert "RULE-008" in content
-    assert content.count("| 0") == 8  # 8 scenario rows
+    assert content.count("| 0") == 9  # 9 scenario rows
 
 
 def test_write_coverage_md_pending(tmp_path):
