@@ -71,6 +71,40 @@ For the sequence rule (RULE-009), seed an `auth_success` followed by a
 `useradd` event on the same host within 10 minutes — the detection cycle will
 fire a `critical` Persistence alert.
 
+## Using real data instead of synthetic events
+
+Two ways to feed the SIEM genuine (non-synthetic) telemetry:
+
+**This machine's real activity** — `forwarders/host_forwarder.py` uses
+[`psutil`](https://pypi.org/project/psutil/) to watch this PC's actual
+processes and outbound network connections (no admin rights, no Sysmon
+required) and forwards anything new:
+
+```bash
+pip install -r forwarders/requirements-windows.txt   # installs psutil (and pywin32 on Windows)
+python forwarders/host_forwarder.py
+```
+
+Open an app or make a network connection on this machine and watch it show
+up in the Event Explorer, with real source/destination IPs (real public IPs
+get real geo/ASN lookups via `app/enrichment.py`).
+
+**Replay a real captured dataset** — `scripts/replay_dataset.py` parses a
+genuine historical log file with the *same parser functions the live
+forwarders use* (`parse_auth_log_line` / `map_sysmon_event`), then posts the
+events to `/ingest`. By default it fetches the
+[loghub `OpenSSH_2k.log` dataset](https://github.com/logpai/loghub/tree/master/OpenSSH) —
+a real, anonymized production sshd log containing genuine brute-force
+activity (one source IP alone makes 286 real failed-login attempts):
+
+```bash
+python -m scripts.replay_dataset --limit 200
+```
+
+Timestamps are rebased to "now" (`--no-rebase` to disable) so the
+aggregation/sequence rules actually fire on replay. `--source sysmon`
+supports replaying your own real Sysmon EventXML export via `--file`.
+
 ## Attack Lab
 
 Nine attack simulation scripts (bash for Linux, PowerShell for Windows) each

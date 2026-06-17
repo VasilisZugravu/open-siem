@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Alert Feed{% endblock %}
+{% block live_badge %}
+{% if request.args.get('live') != '0' %}
+<div class="container">
+    <span class="badge bg-danger">&#9679; LIVE</span>
+    <small class="text-muted">auto-refreshing every 5s &mdash; <a href="?live=0">pause</a></small>
+</div>
+{% else %}
+<div class="container">
+    <span class="badge bg-secondary">&#9679; PAUSED</span>
+    <small class="text-muted"><a href="?">resume live updates</a></small>
+</div>
+{% endif %}
+{% endblock %}
 {% block content %}
 <div class="row mb-4">
     <div class="col-md-6">
@@ -50,5 +63,8 @@ new Chart(document.getElementById('severityChart'), {
         datasets: [{ label: 'Alerts by severity', data: {{ severity_values | tojson }} }]
     }
 });
+{% if request.args.get('live') != '0' %}
+setTimeout(() => location.reload(), 5000);
+{% endif %}
 </script>
 {% endblock %}

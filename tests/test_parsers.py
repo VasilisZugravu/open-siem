@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from forwarders.linux_forwarder import parse_auth_log_line
 from forwarders.windows_forwarder import map_sysmon_event
 
@@ -199,3 +201,40 @@ def test_map_network_connection_c2_port():
 
 def test_map_unhandled_event_id_returns_none():
     assert map_sysmon_event(SYSMON_PROCESS_TERMINATE) is None
+
+
+def test_replay_dispatch_auth_line_uses_auth_parser():
+    from scripts.replay_dataset import parse_events
+
+    line = "Jun 16 10:23:45 linux-vm sshd[1234]: Failed password for root from 203.0.113.50 port 51234 ssh2"
+    events = parse_events([line], "auth")
+    assert len(events) == 1
+    assert events[0]["event_type"] == "auth_failure"
+
+
+def test_replay_dispatch_sysmon_line_uses_sysmon_parser():
+    from scripts.replay_dataset import parse_events
+
+    events = parse_events([SYSMON_ENCODED_POWERSHELL], "sysmon")
+    assert len(events) == 1
+    assert events[0]["event_type"] == "process_creation"
+
+
+def test_replay_dispatch_skips_unparseable_lines():
+    from scripts.replay_dataset import parse_events
+
+    unrelated = "Jun 16 10:24:30 linux-vm CRON[5678]: pam_unix(cron:session): session opened for user root"
+    events = parse_events([unrelated], "auth")
+    assert events == []
+
+
+def test_replay_rebase_timestamps_preserves_order_and_steps_evenly():
+    from scripts.replay_dataset import rebase_timestamps
+    from datetime import datetime
+
+    events = [{"event_type": "auth_failure"}, {"event_type": "auth_success"}, {"event_type": "command_execution"}]
+    rebase_timestamps(events, step_seconds=2.0)
+
+    timestamps = [datetime.fromisoformat(e["timestamp"]) for e in events]
+    assert timestamps[1] - timestamps[0] == timedelta(seconds=2)
+    assert timestamps[2] - timestamps[1] == timedelta(seconds=2)

@@ -4,7 +4,11 @@
 <h2>{{ alert.title }}</h2>
 <table class="table table-bordered w-auto">
     <tr><th>Severity</th><td>{{ alert.severity }}</td></tr>
-    <tr><th>ATT&amp;CK Technique</th><td>{{ alert.attack_technique }}</td></tr>
+    <tr><th>ATT&amp;CK Technique</th><td>
+        <a href="https://attack.mitre.org/techniques/{{ alert.attack_technique.split('.')[0] }}/{% if '.' in alert.attack_technique %}{{ alert.attack_technique.split('.')[1] }}/{% endif %}" target="_blank" rel="noopener">
+            {{ alert.attack_technique }}
+        </a>
+    </td></tr>
     <tr><th>ATT&amp;CK Tactic</th><td>{{ alert.attack_tactic }}</td></tr>
     <tr><th>Host</th><td>{{ alert.host }}</td></tr>
     <tr><th>Created</th><td>{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td></tr>
@@ -35,7 +39,10 @@
 <h3>Triggering Events</h3>
 <table class="table table-sm">
     <thead>
-        <tr><th>Time</th><th>Event Type</th><th>User</th><th>Source IP</th><th>Geo / ASN (mock)</th><th>Raw</th></tr>
+        <tr>
+            <th>Time</th><th>Event Type</th><th>User</th><th>Source IP</th>
+            <th>Geo / ASN (mock)</th><th>Dest IP:Port</th><th>PID</th><th>Parent Process</th><th>Raw</th>
+        </tr>
     </thead>
     <tbody>
         {% for event in events %}
@@ -51,6 +58,9 @@
                 <span class="text-muted">private</span>
               {% endif %}
             </td>
+            <td>{% if event.dest_ip %}{{ event.dest_ip }}{% if event.details and event.details.dest_port %}:{{ event.details.dest_port }}{% endif %}{% endif %}</td>
+            <td>{{ (event.details or {}).pid or "" }}</td>
+            <td>{{ (event.details or {}).parent_process or "" }}</td>
             <td><code>{{ event.raw or "" }}</code></td>
         </tr>
         {% endfor %}
