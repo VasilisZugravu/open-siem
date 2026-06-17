@@ -46,28 +46,66 @@ gitignored — `SECRET_KEY` and `INGEST_API_KEY` have no built-in default and
 compose will refuse to start without them; generate values with
 `python -c "import secrets; print(secrets.token_hex(32))"`.
 
-## Running locally without Docker
+## Running locally without Docker (step by step)
 
-```bash
-pip install -r requirements.txt
-export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
-export INGEST_API_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
-python run.py
-```
+1. **Clone and enter the repo, then create a virtualenv:**
 
-`SECRET_KEY` (Flask session signing) and `INGEST_API_KEY` (auth for `/ingest`
-and `/api/alerts`) are required outside of tests — the app refuses to start
-without them, since neither has a safe default. To run `/ingest` open with
-no key (e.g. an isolated lab box), set `ALLOW_UNAUTHENTICATED_INGEST=1`
-instead of `INGEST_API_KEY` — but then anyone who can reach the app can
-inject events.
+   ```bash
+   python -m venv venv
+   source venv/bin/activate        # Windows: venv\Scripts\activate
+   ```
 
-By default this uses a local SQLite database file (`siem.db`). Set the
-`DATABASE_URL` environment variable to point at Postgres instead, e.g.:
+2. **Install dependencies:**
 
-```bash
-export DATABASE_URL=postgresql://siem:siem@localhost:5432/siem
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set the required secrets** — `SECRET_KEY` (Flask session signing) and
+   `INGEST_API_KEY` (auth for `/ingest` and `/api/alerts`) have no built-in
+   default and the app refuses to start without them:
+
+   ```bash
+   export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+   export INGEST_API_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+   ```
+
+   (Windows PowerShell: `$env:SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"`,
+   same for `INGEST_API_KEY`.) To leave `/ingest` open with no key (e.g. an
+   isolated lab box), set `ALLOW_UNAUTHENTICATED_INGEST=1` instead of
+   `INGEST_API_KEY` — but then anyone who can reach the app can inject events.
+
+4. **(Optional) point at Postgres instead of SQLite** — by default the app
+   uses a local SQLite file (`siem.db`); skip this step to just use that:
+
+   ```bash
+   export DATABASE_URL=postgresql://siem:siem@localhost:5432/siem
+   ```
+
+5. **Start the app:**
+
+   ```bash
+   python run.py
+   ```
+
+   Database tables are created automatically on first start.
+
+6. **Create the admin login** (see [Dashboard login](#dashboard-login) below
+   for details):
+
+   ```bash
+   flask --app run create-admin --username admin
+   ```
+
+7. **(Optional) seed demo data** so the dashboard has something to show:
+
+   ```bash
+   python scripts/seed_demo_data.py
+   ```
+
+8. **Open the dashboard** at http://localhost:5000 and log in with the
+   credentials from step 6 (or `admin` / `demo` if you used the seed script's
+   default).
 
 ## Dashboard login
 
