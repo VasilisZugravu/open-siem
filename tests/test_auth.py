@@ -137,6 +137,25 @@ def test_api_alerts_with_correct_key_returns_200(authed_client):
     assert isinstance(response.get_json(), list)
 
 
+def test_api_alerts_compares_key_in_constant_time(authed_client, monkeypatch):
+    """Same rationale as the /ingest key check: must use secrets.compare_digest,
+    not `!=`, to avoid a timing side-channel on the API key."""
+    import app.dashboard.routes as routes
+
+    calls = []
+    real_compare_digest = routes.secrets.compare_digest
+
+    def spy_compare_digest(a, b):
+        calls.append((a, b))
+        return real_compare_digest(a, b)
+
+    monkeypatch.setattr(routes.secrets, "compare_digest", spy_compare_digest)
+
+    authed_client.get("/api/alerts", headers={"X-Api-Key": "wrong-key"})
+
+    assert calls, "expected the API key check to go through secrets.compare_digest"
+
+
 def test_api_alerts_no_key_configured_allows_through(client):
     """When INGEST_API_KEY is not set, a logged-in dashboard session can still
     reach /api/alerts (existing behaviour)."""
@@ -150,6 +169,108 @@ def test_api_alerts_no_key_configured_blocks_anonymous_access(anon_client):
     response = anon_client.get("/api/alerts")
     assert response.status_code == 401
     assert response.get_json()["error"] == "unauthorized"
+
+
+# ── Login is throttled against brute-force guessing ────────────────────────
+
+def test_login_locks_out_after_too_many_failed_attempts(authed_client):
+    from app.dashboard.routes import LOGIN_MAX_ATTEMPTS
+
+    for _ in range(LOGIN_MAX_ATTEMPTS):
+        response = authed_client.post(
+            "/login", data={"username": "admin", "password": "wrong"}
+        )
+        assert response.status_code == 200
+
+    locked_response = authed_client.post(
+        "/login", data={"username": "admin", "password": "wrong"}
+    )
+    assert locked_response.status_code == 429
+
+
+def test_login_lockout_also_blocks_the_correct_password(authed_client):
+    """Once locked out, even the correct password must not log the attacker
+    in — the lockout has to apply before credentials are checked."""
+    from app.dashboard.routes import LOGIN_MAX_ATTEMPTS
+
+    for _ in range(LOGIN_MAX_ATTEMPTS):
+        authed_client.post("/login", data={"username": "admin", "password": "wrong"})
+
+    response = authed_client.post(
+        "/login", data={"username": "admin", "password": "secret"}, follow_redirects=False
+    )
+    assert response.status_code == 429
+
+    whoami = authed_client.get("/")
+    assert whoami.status_code == 302  # still not logged in
+
+
+def test_login_lockout_is_scoped_per_client_ip(authed_app):
+    """A lockout triggered by one source IP must not block a different IP —
+    otherwise an attacker could DoS the real admin just by failing logins."""
+    from app.dashboard.routes import LOGIN_MAX_ATTEMPTS
+
+    attacker = authed_app.test_client()
+    for _ in range(LOGIN_MAX_ATTEMPTS):
+        attacker.post(
+            "/login",
+            data={"username": "admin", "password": "wrong"},
+            environ_overrides={"REMOTE_ADDR": "203.0.113.50"},
+        )
+    locked = attacker.post(
+        "/login",
+        data={"username": "admin", "password": "wrong"},
+        environ_overrides={"REMOTE_ADDR": "203.0.113.50"},
+    )
+    assert locked.status_code == 429
+
+    admin = authed_app.test_client()
+    response = admin.post(
+        "/login",
+        data={"username": "admin", "password": "secret"},
+        environ_overrides={"REMOTE_ADDR": "198.51.100.7"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+
+
+def test_login_lockout_expires_after_the_window(authed_client, monkeypatch):
+    from app.dashboard import routes
+    from app.dashboard.routes import LOGIN_MAX_ATTEMPTS
+
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(routes.time, "monotonic", lambda: clock["now"])
+
+    for _ in range(LOGIN_MAX_ATTEMPTS):
+        authed_client.post("/login", data={"username": "admin", "password": "wrong"})
+    locked = authed_client.post("/login", data={"username": "admin", "password": "wrong"})
+    assert locked.status_code == 429
+
+    clock["now"] += routes.LOGIN_LOCKOUT_WINDOW_SECONDS + 1
+
+    response = authed_client.post(
+        "/login", data={"username": "admin", "password": "secret"}, follow_redirects=False
+    )
+    assert response.status_code == 302
+
+
+def test_successful_login_resets_the_attempt_counter(authed_client):
+    from app.dashboard.routes import LOGIN_MAX_ATTEMPTS
+
+    for _ in range(LOGIN_MAX_ATTEMPTS - 1):
+        authed_client.post("/login", data={"username": "admin", "password": "wrong"})
+
+    success = authed_client.post(
+        "/login", data={"username": "admin", "password": "secret"}, follow_redirects=False
+    )
+    assert success.status_code == 302
+
+    authed_client.get("/logout")
+    again = authed_client.post(
+        "/login", data={"username": "admin", "password": "secret"}, follow_redirects=False
+    )
+    assert again.status_code == 302
 
 
 # ── Login redirect (`next` param) is restricted to local paths ─────────────

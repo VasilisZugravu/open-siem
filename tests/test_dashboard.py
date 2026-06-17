@@ -286,6 +286,17 @@ def test_start_feed(client):
     assert feed_manager.is_running("machine")
 
 
+def test_start_feed_ignores_referrer_and_redirects_to_alert_feed(client):
+    """The redirect target must not echo an attacker-controlled Referer
+    header — always land back on the fixed alert feed page."""
+    response = client.post(
+        "/feeds/machine/start", headers={"Referer": "https://evil.example/phish"}
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+
+
 def test_stop_feed(client):
     client.post("/feeds/machine/start")
     response = client.post("/feeds/machine/stop")

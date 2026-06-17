@@ -1,3 +1,6 @@
+import secrets
+import threading
+import time
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app
@@ -17,6 +20,51 @@ dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
 # username always pays that cost, letting an attacker enumerate usernames
 # by response time.
 _DUMMY_PASSWORD_HASH = generate_password_hash("")
+
+# Per-source-IP login throttling: brute-forcing the single admin account has
+# no other defense (timing equalization stops enumeration, not guessing).
+# Keyed by IP rather than username so an attacker can't lock the real admin
+# out just by failing logins under their name from elsewhere. State lives on
+# the Flask app (current_app.extensions), not a module global, so each app
+# instance (and each test's fresh app) starts with a clean slate.
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_WINDOW_SECONDS = 300
+_login_attempts_lock = threading.Lock()
+
+
+def _login_attempts_store():
+    return current_app.extensions.setdefault("login_attempts", {})
+
+
+def _login_rate_limited(ip):
+    """True if `ip` has hit LOGIN_MAX_ATTEMPTS failures within the window."""
+    with _login_attempts_lock:
+        store = _login_attempts_store()
+        entry = store.get(ip)
+        if entry is None:
+            return False
+        count, window_start = entry
+        if time.monotonic() - window_start > LOGIN_LOCKOUT_WINDOW_SECONDS:
+            del store[ip]
+            return False
+        return count >= LOGIN_MAX_ATTEMPTS
+
+
+def _record_login_failure(ip):
+    with _login_attempts_lock:
+        store = _login_attempts_store()
+        entry = store.get(ip)
+        now = time.monotonic()
+        if entry is None or now - entry[1] > LOGIN_LOCKOUT_WINDOW_SECONDS:
+            store[ip] = (1, now)
+        else:
+            count, window_start = entry
+            store[ip] = (count + 1, window_start)
+
+
+def _clear_login_failures(ip):
+    with _login_attempts_lock:
+        _login_attempts_store().pop(ip, None)
 
 
 def _is_safe_redirect_target(target):
@@ -71,7 +119,7 @@ def start_feed(name):
         flash(f"Started {FEEDS[name]['label']}.")
     else:
         flash(f"{FEEDS[name]['label']} is already running.")
-    return redirect(request.referrer or url_for("dashboard.alert_feed"))
+    return redirect(url_for("dashboard.alert_feed"))
 
 
 @dashboard_bp.route("/feeds/<name>/stop", methods=["POST"])
@@ -83,7 +131,7 @@ def stop_feed(name):
         flash(f"Stopped {FEEDS[name]['label']}.")
     else:
         flash(f"{FEEDS[name]['label']} is not running.")
-    return redirect(request.referrer or url_for("dashboard.alert_feed"))
+    return redirect(url_for("dashboard.alert_feed"))
 
 
 @dashboard_bp.route("/alerts/<int:alert_id>")
@@ -192,17 +240,23 @@ def event_explorer():
 @dashboard_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        if _login_rate_limited(request.remote_addr):
+            flash("Too many failed login attempts. Try again later.")
+            return render_template("login.html"), 429
+
         username = request.form.get("username", "")
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
         if user is None:
             check_password_hash(_DUMMY_PASSWORD_HASH, password)  # equalize timing
         elif user.check_password(password):
+            _clear_login_failures(request.remote_addr)
             login_user(user)
             next_page = request.args.get("next")
             if not _is_safe_redirect_target(next_page):
                 next_page = url_for("dashboard.alert_feed")
             return redirect(next_page)
+        _record_login_failure(request.remote_addr)
         flash("Invalid username or password.")
     return render_template("login.html")
 
@@ -219,7 +273,7 @@ def logout():
 def api_alerts():
     expected_key = current_app.config.get("INGEST_API_KEY")
     if expected_key:
-        if request.headers.get("X-Api-Key") != expected_key:
+        if not secrets.compare_digest(request.headers.get("X-Api-Key", ""), expected_key):
             return jsonify({"error": "unauthorized"}), 401
     elif not current_user.is_authenticated:
         # No API key configured: fail closed rather than serving alert data

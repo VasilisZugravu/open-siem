@@ -38,6 +38,11 @@ def test_seed_demo_admin_does_not_start_scheduler(monkeypatch):
     detection-cycle thread against the same database."""
     import app as app_module
 
+    # Real (non-TESTING) create_app() now requires these, same as the live
+    # server it's seeding alongside would already have set.
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("ALLOW_UNAUTHENTICATED_INGEST", "1")
+
     captured = {}
     real_create_app = app_module.create_app
 

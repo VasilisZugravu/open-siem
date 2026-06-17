@@ -137,3 +137,30 @@ def test_ingest_accepts_correct_key(authed_client):
     )
 
     assert response.status_code == 201
+
+
+def test_ingest_compares_api_key_in_constant_time(authed_client, monkeypatch):
+    """The API key check must use secrets.compare_digest, not `!=`, so an
+    attacker can't recover the key byte-by-byte via response timing."""
+    import app.ingest as ingest
+
+    calls = []
+    real_compare_digest = ingest.secrets.compare_digest
+
+    def spy_compare_digest(a, b):
+        calls.append((a, b))
+        return real_compare_digest(a, b)
+
+    monkeypatch.setattr(ingest.secrets, "compare_digest", spy_compare_digest)
+
+    authed_client.post(
+        "/ingest",
+        json={
+            "timestamp": "2026-06-16T10:00:00",
+            "host": "linux-vm",
+            "event_type": "auth_failure",
+        },
+        headers={"X-Api-Key": "wrong-key"},
+    )
+
+    assert calls, "expected the API key check to go through secrets.compare_digest"

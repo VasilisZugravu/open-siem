@@ -33,6 +33,7 @@ dashboard with an ATT&CK coverage heatmap.
 ## Running with Docker Compose
 
 ```bash
+cp .env.example .env   # fill in SECRET_KEY, INGEST_API_KEY, ADMIN_PASSWORD, POSTGRES_PASSWORD
 docker-compose up --build
 ```
 
@@ -40,14 +41,26 @@ This starts:
 - `db` — PostgreSQL 16
 - `app` — the Flask app at http://localhost:5000
 
-Database tables are created automatically on first start.
+Database tables are created automatically on first start. `.env` is
+gitignored — `SECRET_KEY` and `INGEST_API_KEY` have no built-in default and
+compose will refuse to start without them; generate values with
+`python -c "import secrets; print(secrets.token_hex(32))"`.
 
 ## Running locally without Docker
 
 ```bash
 pip install -r requirements.txt
+export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+export INGEST_API_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
 python run.py
 ```
+
+`SECRET_KEY` (Flask session signing) and `INGEST_API_KEY` (auth for `/ingest`
+and `/api/alerts`) are required outside of tests — the app refuses to start
+without them, since neither has a safe default. To run `/ingest` open with
+no key (e.g. an isolated lab box), set `ALLOW_UNAUTHENTICATED_INGEST=1`
+instead of `INGEST_API_KEY` — but then anyone who can reach the app can
+inject events.
 
 By default this uses a local SQLite database file (`siem.db`). Set the
 `DATABASE_URL` environment variable to point at Postgres instead, e.g.:

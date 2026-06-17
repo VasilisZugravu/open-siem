@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import timezone
 from zoneinfo import ZoneInfo
 
@@ -24,10 +25,49 @@ def create_app(config=None):
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["INGEST_API_KEY"] = os.environ.get("INGEST_API_KEY")
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 
     if config:
         app.config.update(config)
+
+    # Outside TESTING, a forged/leaked SECRET_KEY lets anyone mint a valid
+    # session cookie, and a missing INGEST_API_KEY leaves /ingest open to
+    # the whole network — neither should have a usable hardcoded default.
+    # ALLOW_UNAUTHENTICATED_INGEST is an explicit, deliberate opt-out for the
+    # latter (e.g. a closed network / demo box).
+    if not app.config.get("TESTING"):
+        if not app.config.get("SECRET_KEY"):
+            raise RuntimeError(
+                "SECRET_KEY is not set. Set the SECRET_KEY environment variable "
+                "to a long random value before starting the app."
+            )
+        if not app.config.get("INGEST_API_KEY") and not os.environ.get("ALLOW_UNAUTHENTICATED_INGEST"):
+            raise RuntimeError(
+                "INGEST_API_KEY is not set, which would leave /ingest open to "
+                "anyone on the network. Set INGEST_API_KEY, or set "
+                "ALLOW_UNAUTHENTICATED_INGEST=1 to explicitly accept that risk."
+            )
+    elif not app.config.get("SECRET_KEY"):
+        # Sessions (login, CSRF token) still need a key under TESTING; an
+        # ephemeral random one is fine here since test fixtures don't rely
+        # on it being stable across processes.
+        app.config["SECRET_KEY"] = secrets.token_hex(32)
+
+    # Session cookie carries the login session and the CSRF token: keep it out
+    # of JS (HTTPONLY) and off cross-site requests (SAMESITE). SECURE
+    # (HTTPS-only) is forced off under TESTING — the test client and a plain
+    # local dev server both talk plain HTTP, so the cookie would otherwise
+    # never round-trip. Flask's own config already pre-populates these keys
+    # (HTTPONLY=True, SAMESITE=None, SECURE=False), so setdefault() is a
+    # no-op here — only apply our values where the caller didn't explicitly
+    # override them via `config`.
+    overrides = config or {}
+    if "SESSION_COOKIE_HTTPONLY" not in overrides:
+        app.config["SESSION_COOKIE_HTTPONLY"] = True
+    if "SESSION_COOKIE_SAMESITE" not in overrides:
+        app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if "SESSION_COOKIE_SECURE" not in overrides:
+        app.config["SESSION_COOKIE_SECURE"] = not app.config.get("TESTING")
 
     db.init_app(app)
     app.jinja_env.filters["athens_time"] = to_athens_time

@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_USER: siem
-      POSTGRES_PASSWORD: siem
-      POSTGRES_DB: siem
+      POSTGRES_USER: ${POSTGRES_USER:-siem}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-siem}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U siem"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-siem}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -18,11 +18,11 @@ services:
   app:
     build: .
     environment:
-      DATABASE_URL: postgresql://siem:siem@db:5432/siem
-      SECRET_KEY: change-me-in-production
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: changeme
-      INGEST_API_KEY: changeme
+      DATABASE_URL: postgresql://${POSTGRES_USER:-siem}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-siem}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env to a long random value}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      INGEST_API_KEY: ${INGEST_API_KEY:?set INGEST_API_KEY in .env}
     ports:
       - "5000:5000"
     depends_on:

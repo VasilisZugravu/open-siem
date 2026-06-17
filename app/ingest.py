@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timezone
 from flask import Blueprint, current_app, request, jsonify
 from app.db import db
@@ -12,7 +13,7 @@ REQUIRED_FIELDS = ["timestamp", "host", "event_type"]
 @ingest_bp.route("/ingest", methods=["POST"])
 def ingest_event():
     expected_key = current_app.config.get("INGEST_API_KEY")
-    if expected_key and request.headers.get("X-Api-Key") != expected_key:
+    if expected_key and not secrets.compare_digest(request.headers.get("X-Api-Key", ""), expected_key):
         return jsonify({"error": "unauthorized"}), 401
 
     data = request.get_json(silent=True)
