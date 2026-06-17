@@ -156,9 +156,9 @@ see [docs/false-positives.md](docs/false-positives.md) for the evasion each one 
 
 ## Playbooks and hunting
 
-- **[playbooks/](playbooks/)** — one incident-response playbook per rule
+- **[playbooks/](playbooks/)** — 12 incident-response playbooks, one per rule
   (triage, investigation, containment, escalation, closure criteria).
-- **[hunting/](hunting/)** — proactive SQL hunts for activity the 12 rules
+- **[hunting/](hunting/)** — 5 proactive SQL hunts for activity the 12 rules
   don't cover (LOLBin use outside known flag combos, rare process lineage,
   off-hours privileged commands, beaconing on arbitrary ports, cross-host
   rule fan-out).
