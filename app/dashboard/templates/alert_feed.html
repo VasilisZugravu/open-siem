@@ -2,98 +2,226 @@
 {% block title %}Alert Feed{% endblock %}
 {% block live_badge %}
 {% if request.args.get('live') != '0' %}
-<div class="container">
-    <span class="badge bg-danger">&#9679; LIVE</span>
-    <small class="text-muted">auto-refreshing every 5s &mdash; <a href="?live=0">pause</a></small>
-</div>
+<span class="live-pill is-live"><span class="dot"></span> Live <a href="?live=0">(pause)</a></span>
 {% else %}
-<div class="container">
-    <span class="badge bg-secondary">&#9679; PAUSED</span>
-    <small class="text-muted"><a href="?">resume live updates</a></small>
-</div>
+<span class="live-pill"><span class="dot"></span> Paused <a href="?">(resume)</a></span>
 {% endif %}
 {% endblock %}
 {% block content %}
-<div class="card mb-4">
-    <div class="card-header">Telemetry Feeds</div>
-    <ul class="list-group list-group-flush">
+<div class="page-header" data-animate>
+    <div>
+        <h1 class="page-title">Alert Feed</h1>
+        <p class="page-subtitle">Live detections across all telemetry sources</p>
+    </div>
+</div>
+
+<div class="metric-grid">
+    <div class="metric-card" data-animate>
+        <div class="metric-label">Total Alerts</div>
+        <div class="metric-value" data-count="{{ metrics.total_alerts }}">0</div>
+    </div>
+    <div class="metric-card" data-animate>
+        <div class="metric-label">Last 24h</div>
+        <div class="metric-value accent" data-count="{{ metrics.alerts_24h }}">0</div>
+    </div>
+    <div class="metric-card" data-animate>
+        <div class="metric-label">Critical</div>
+        <div class="metric-value crit" data-count="{{ metrics.critical }}">0</div>
+    </div>
+    <div class="metric-card" data-animate>
+        <div class="metric-label">Active Feeds</div>
+        <div class="metric-value" data-count="{{ metrics.active_feeds }}">0</div>
+    </div>
+</div>
+
+<div class="panel mb-4" data-animate>
+    <div class="panel-header">Telemetry Feeds</div>
+    <div class="panel-body" id="feed-list">
         {% for name, feed in feeds.items() %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div class="feed-card" data-feed="{{ name }}">
             <div>
-                <strong>{{ feed.label }}</strong>
-                <span class="badge {{ 'bg-success' if feed_status[name] else 'bg-secondary' }} ms-2">
-                    {{ 'Running' if feed_status[name] else 'Stopped' }}
-                </span>
-                <div class="text-muted small">{{ feed.description }}</div>
+                <div class="feed-title">{{ feed.label }}
+                    <span class="badge-pill {{ 'badge-running' if feed_status[name] else 'badge-stopped' }} ms-2" data-feed-status>
+                        {{ 'Running' if feed_status[name] else 'Stopped' }}
+                    </span>
+                </div>
+                <div class="feed-desc">{{ feed.description }}</div>
             </div>
             <div>
                 {% if feed_status[name] %}
-                <form method="post" action="{{ url_for('dashboard.stop_feed', name=name) }}" class="d-inline">
+                <form method="post" action="{{ url_for('dashboard.stop_feed', name=name) }}" class="d-inline" data-loading-btn>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm">Stop</button>
                 </form>
                 {% else %}
-                <form method="post" action="{{ url_for('dashboard.start_feed', name=name) }}" class="d-inline">
+                <form method="post" action="{{ url_for('dashboard.start_feed', name=name) }}" class="d-inline" data-loading-btn>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-success btn-sm">Start</button>
                 </form>
                 {% endif %}
             </div>
-        </li>
+        </div>
         {% endfor %}
-    </ul>
+    </div>
 </div>
+
 <div class="row mb-4">
-    <div class="col-md-6">
-        <canvas id="hourlyChart"></canvas>
+    <div class="col-md-6 mb-3 mb-md-0">
+        <div class="panel" data-animate>
+            <div class="panel-header">Alerts per Hour</div>
+            <div class="panel-body"><canvas id="hourlyChart" height="220"></canvas></div>
+        </div>
     </div>
     <div class="col-md-6">
-        <canvas id="severityChart"></canvas>
+        <div class="panel" data-animate>
+            <div class="panel-header">By Severity</div>
+            <div class="panel-body"><canvas id="severityChart" height="220"></canvas></div>
+        </div>
     </div>
 </div>
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Time</th>
-            <th>Severity</th>
-            <th>Title</th>
-            <th>ATT&amp;CK</th>
-            <th>Host</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for alert in alerts %}
-        <tr>
-            <td>{{ alert.created_at|athens_time }}</td>
-            <td>{{ alert.severity }}</td>
-            <td><a href="{{ url_for('dashboard.alert_detail', alert_id=alert.id) }}">{{ alert.title }}</a></td>
-            <td>{{ alert.attack_technique }}</td>
-            <td>{{ alert.host }}</td>
-            <td>{{ alert.status }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+
+<div class="panel" data-animate>
+    <div class="panel-header">Recent Alerts</div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Severity</th>
+                    <th>Title</th>
+                    <th>ATT&amp;CK</th>
+                    <th>Host</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="alerts-body">
+                {% for alert in alerts %}
+                <tr class="row-link" data-href="{{ url_for('dashboard.alert_detail', alert_id=alert.id) }}">
+                    <td class="mono">{{ alert.created_at|athens_time }}</td>
+                    <td><span class="badge-pill badge-{{ alert.severity }}">{{ alert.severity }}</span></td>
+                    <td><a href="{{ url_for('dashboard.alert_detail', alert_id=alert.id) }}">{{ alert.title }}</a></td>
+                    <td class="mono">{{ alert.attack_technique }}</td>
+                    <td>{{ alert.host }}</td>
+                    <td><span class="badge-pill badge-status-{{ alert.status }}">{{ alert.status|replace('_', ' ') }}</span></td>
+                </tr>
+                {% else %}
+                <tr class="empty-row"><td colspan="6">No alerts yet — start a telemetry feed above to begin generating detections.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-new Chart(document.getElementById('hourlyChart'), {
-    type: 'bar',
-    data: {
-        labels: {{ hourly_labels | tojson }},
-        datasets: [{ label: 'Alerts per hour', data: {{ hourly_values | tojson }} }]
+(function () {
+    var palette = window.SIEM.chartPalette;
+
+    var hourlyChart = new Chart(document.getElementById('hourlyChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ hourly_labels | tojson }},
+            datasets: [{
+                label: 'Alerts per hour',
+                data: {{ hourly_values | tojson }},
+                backgroundColor: palette.accent,
+                borderRadius: 4,
+                maxBarThickness: 28
+            }]
+        },
+        options: {
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: palette.grid }, ticks: { precision: 0 } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    var severityChart = new Chart(document.getElementById('severityChart'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ severity_labels | tojson }},
+            datasets: [{
+                label: 'Alerts by severity',
+                data: {{ severity_values | tojson }},
+                backgroundColor: [palette.crit, palette.high, palette.med, palette.low, palette.info],
+                borderColor: 'rgba(11,17,32,1)',
+                borderWidth: 2
+            }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+    });
+
+    document.querySelectorAll('#alerts-body tr.row-link').forEach(function (row) {
+        row.addEventListener('click', function (e) {
+            if (e.target.closest('a')) return;
+            window.location = row.dataset.href;
+        });
+    });
+
+    var statusLabel = { new: 'New', in_progress: 'In Progress', closed_tp: 'Closed - True Positive', closed_fp: 'Closed - False Positive' };
+
+    function renderFeed(data) {
+        var metricEls = document.querySelectorAll('.metric-value');
+        window.SIEM.countUp(metricEls[0], data.metrics.total_alerts);
+        window.SIEM.countUp(metricEls[1], data.metrics.alerts_24h);
+        window.SIEM.countUp(metricEls[2], data.metrics.critical);
+        window.SIEM.countUp(metricEls[3], data.metrics.active_feeds);
+
+        hourlyChart.data.labels = data.hourly_labels;
+        hourlyChart.data.datasets[0].data = data.hourly_values;
+        hourlyChart.update();
+
+        severityChart.data.labels = data.severity_labels;
+        severityChart.data.datasets[0].data = data.severity_values;
+        severityChart.update();
+
+        document.querySelectorAll('.feed-card').forEach(function (card) {
+            var name = card.dataset.feed;
+            var running = data.feed_status[name];
+            var badge = card.querySelector('[data-feed-status]');
+            if (badge) {
+                badge.textContent = running ? 'Running' : 'Stopped';
+                badge.className = 'badge-pill ms-2 ' + (running ? 'badge-running' : 'badge-stopped');
+            }
+        });
+
+        var tbody = document.getElementById('alerts-body');
+        var existingIds = new Set(Array.prototype.map.call(tbody.querySelectorAll('tr'), function (tr) { return tr.dataset.id; }));
+        var html = '';
+        data.alerts.forEach(function (a) {
+            var isNew = !existingIds.has(String(a.id));
+            html += '<tr class="row-link' + (isNew ? ' row-enter' : '') + '" data-id="' + a.id + '" data-href="' + a.url + '">' +
+                '<td class="mono">' + a.created_at + '</td>' +
+                '<td><span class="badge-pill badge-' + a.severity + '">' + a.severity + '</span></td>' +
+                '<td><a href="' + a.url + '">' + escapeHtml(a.title) + '</a></td>' +
+                '<td class="mono">' + escapeHtml(a.attack_technique) + '</td>' +
+                '<td>' + escapeHtml(a.host) + '</td>' +
+                '<td><span class="badge-pill badge-status-' + a.status + '">' + (statusLabel[a.status] || a.status) + '</span></td>' +
+                '</tr>';
+        });
+        tbody.innerHTML = html || '<tr class="empty-row"><td colspan="6">No alerts yet — start a telemetry feed above to begin generating detections.</td></tr>';
+        tbody.querySelectorAll('tr.row-link').forEach(function (row) {
+            row.addEventListener('click', function (e) {
+                if (e.target.closest('a')) return;
+                window.location = row.dataset.href;
+            });
+        });
     }
-});
-new Chart(document.getElementById('severityChart'), {
-    type: 'doughnut',
-    data: {
-        labels: {{ severity_labels | tojson }},
-        datasets: [{ label: 'Alerts by severity', data: {{ severity_values | tojson }} }]
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
     }
-});
-{% if request.args.get('live') != '0' %}
-setTimeout(() => location.reload(), 5000);
-{% endif %}
+
+    window.SIEM.initLive({
+        root: document,
+        endpoint: "{{ url_for('dashboard.api_feed') }}",
+        render: renderFeed,
+        intervalMs: 5000
+    });
+})();
 </script>
 {% endblock %}

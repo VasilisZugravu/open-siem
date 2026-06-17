@@ -13,7 +13,12 @@ from app.models import Alert, Event, User
 from app.detection import RULES_DIR
 from app.detection.rules_loader import load_rules
 
-dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
+dashboard_bp = Blueprint(
+    "dashboard", __name__,
+    template_folder="templates",
+    static_folder="static",
+    static_url_path="/dashboard-static",
+)
 
 # Used to equalize login timing for unknown usernames — without this, a
 # missing user skips check_password's hashing entirely while a known
@@ -77,9 +82,8 @@ def _is_safe_redirect_target(target):
     return not parts.scheme and not parts.netloc and target.startswith("/") and not target.startswith("//")
 
 
-@dashboard_bp.route("/")
-@login_required
-def alert_feed():
+def _alert_feed_data():
+    """Shared data for the alert feed page render and its /api/feed AJAX poll."""
     alerts = Alert.query.order_by(Alert.created_at.desc()).limit(50).all()
 
     since = datetime.utcnow() - timedelta(hours=24)
@@ -93,21 +97,73 @@ def alert_feed():
     hourly_values = [hourly_counts[label] for label in hourly_labels]
 
     severity_counts = {}
+    total_alerts = 0
     for alert in Alert.query.all():
         severity_counts[alert.severity] = severity_counts.get(alert.severity, 0) + 1
+        total_alerts += 1
 
     feed_status = feed_manager.status()
 
+    metrics = {
+        "total_alerts": total_alerts,
+        "alerts_24h": len(recent_alerts),
+        "critical": severity_counts.get("critical", 0),
+        "active_feeds": sum(1 for running in feed_status.values() if running),
+    }
+
+    return {
+        "alerts": alerts,
+        "hourly_labels": hourly_labels,
+        "hourly_values": hourly_values,
+        "severity_labels": list(severity_counts.keys()),
+        "severity_values": list(severity_counts.values()),
+        "feed_status": feed_status,
+        "metrics": metrics,
+    }
+
+
+@dashboard_bp.route("/")
+@login_required
+def alert_feed():
+    data = _alert_feed_data()
     return render_template(
         "alert_feed.html",
-        alerts=alerts,
-        hourly_labels=hourly_labels,
-        hourly_values=hourly_values,
-        severity_labels=list(severity_counts.keys()),
-        severity_values=list(severity_counts.values()),
+        alerts=data["alerts"],
+        hourly_labels=data["hourly_labels"],
+        hourly_values=data["hourly_values"],
+        severity_labels=data["severity_labels"],
+        severity_values=data["severity_values"],
         feeds=FEEDS,
-        feed_status=feed_status,
+        feed_status=data["feed_status"],
+        metrics=data["metrics"],
     )
+
+
+@dashboard_bp.route("/api/feed")
+@login_required
+def api_feed():
+    data = _alert_feed_data()
+    return jsonify({
+        "metrics": data["metrics"],
+        "hourly_labels": data["hourly_labels"],
+        "hourly_values": data["hourly_values"],
+        "severity_labels": data["severity_labels"],
+        "severity_values": data["severity_values"],
+        "feed_status": data["feed_status"],
+        "alerts": [
+            {
+                "id": a.id,
+                "created_at": to_athens_time(a.created_at),
+                "severity": a.severity,
+                "title": a.title,
+                "attack_technique": a.attack_technique,
+                "host": a.host,
+                "status": a.status,
+                "url": url_for("dashboard.alert_detail", alert_id=a.id),
+            }
+            for a in data["alerts"]
+        ],
+    })
 
 
 @dashboard_bp.route("/feeds/<name>/start", methods=["POST"])
@@ -193,14 +249,9 @@ def heatmap():
     return render_template("heatmap.html", rows=rows)
 
 
-@dashboard_bp.route("/events")
-@login_required
-def event_explorer():
+def _event_explorer_data(host, event_type, search):
+    """Shared query for the event explorer page render and its /api/events poll."""
     query = Event.query
-
-    host = request.args.get("host")
-    event_type = request.args.get("event_type")
-    search = request.args.get("search")
 
     if host:
         query = query.filter(Event.host == host)
@@ -225,6 +276,56 @@ def event_explorer():
     if host:
         event_types_query = event_types_query.filter(Event.host == host)
     event_types = sorted({row[0] for row in event_types_query.all()})
+
+    return events, hosts, event_types
+
+
+def _event_to_dict(event):
+    details = event.details or {}
+    enrichment = event.enrichment or {}
+    geo = ""
+    if enrichment and not enrichment.get("is_private") and enrichment.get("country"):
+        geo = enrichment["country"] + (f" · AS{enrichment['asn']}" if enrichment.get("asn") else "")
+    elif enrichment and enrichment.get("is_private"):
+        geo = "private"
+    dest = event.dest_ip or ""
+    if dest and details.get("dest_port"):
+        dest = f"{dest}:{details.get('dest_port')}"
+    return {
+        "timestamp": to_athens_time(event.timestamp),
+        "host": event.host,
+        "event_type": event.event_type,
+        "direction": details.get("direction") or "",
+        "user": event.user or "",
+        "src_ip": event.src_ip or "",
+        "geo": geo,
+        "dest": dest,
+        "remote_host": details.get("remote_host") or "",
+        "process_name": event.process_name or "",
+        "pid": details.get("pid") or "",
+        "parent_process": details.get("parent_process") or "",
+        "command_line": event.command_line or event.raw or "",
+    }
+
+
+@dashboard_bp.route("/api/events")
+@login_required
+def api_events():
+    host = request.args.get("host") or None
+    event_type = request.args.get("event_type") or None
+    search = request.args.get("search") or None
+    events, _hosts, _event_types = _event_explorer_data(host, event_type, search)
+    return jsonify({"events": [_event_to_dict(e) for e in events]})
+
+
+@dashboard_bp.route("/events")
+@login_required
+def event_explorer():
+    host = request.args.get("host")
+    event_type = request.args.get("event_type")
+    search = request.args.get("search")
+
+    events, hosts, event_types = _event_explorer_data(host, event_type, search)
 
     return render_template(
         "event_explorer.html",

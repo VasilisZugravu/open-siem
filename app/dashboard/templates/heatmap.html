@@ -1,24 +1,30 @@
 {% extends "base.html" %}
 {% block title %}ATT&amp;CK Heatmap{% endblock %}
 {% block content %}
-<h2>ATT&amp;CK Coverage Heatmap</h2>
-<p>
-    <span class="badge bg-success">covered</span> = rule exists, hasn't fired &nbsp;
-    <span class="badge bg-danger">fired</span> = rule exists and has triggered at least one alert
-</p>
-<table class="table table-bordered">
-    <thead>
-        <tr><th>Tactic</th><th>Technique</th><th>Rule</th><th>Status</th></tr>
-    </thead>
-    <tbody>
-        {% for row in rows %}
-        <tr class="{{ 'table-danger' if row.status == 'fired' else 'table-success' }}">
-            <td>{{ row.tactic }}</td>
-            <td>{{ row.technique }}</td>
-            <td>{{ row.title }}</td>
-            <td>{{ row.status }}</td>
-        </tr>
+<div class="page-header" data-animate>
+    <div>
+        <h1 class="page-title">ATT&amp;CK Coverage Heatmap</h1>
+        <p class="page-subtitle">Detection rule coverage mapped to MITRE ATT&amp;CK</p>
+    </div>
+    <div class="legend">
+        <span><span class="badge-pill badge-covered">covered</span> rule exists, hasn't fired</span>
+        <span><span class="badge-pill badge-fired">fired</span> rule exists and has triggered an alert</span>
+    </div>
+</div>
+
+{% set tactics = rows | groupby('tactic') %}
+{% for tactic, tactic_rows in tactics %}
+<div class="heatmap-tactic" data-animate>
+    <div class="heatmap-tactic-title">{{ tactic }}</div>
+    <div class="heatmap-grid">
+        {% for row in tactic_rows %}
+        <div class="heatmap-cell status-{{ row.status }}">
+            <div class="technique-id mono">{{ row.technique }}</div>
+            <div class="rule-title">{{ row.title }}</div>
+            <span class="badge-pill badge-{{ row.status }} mt-2">{{ row.status }}</span>
+        </div>
         {% endfor %}
-    </tbody>
-</table>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}

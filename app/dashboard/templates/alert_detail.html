@@ -1,74 +1,99 @@
 {% extends "base.html" %}
 {% block title %}Alert Detail{% endblock %}
 {% block content %}
-<h2>{{ alert.title }}</h2>
-<table class="table table-bordered w-auto">
-    <tr><th>Severity</th><td>{{ alert.severity }}</td></tr>
-    <tr><th>ATT&amp;CK Technique</th><td>
-        <a href="https://attack.mitre.org/techniques/{{ alert.attack_technique.split('.')[0] }}/{% if '.' in alert.attack_technique %}{{ alert.attack_technique.split('.')[1] }}/{% endif %}" target="_blank" rel="noopener">
-            {{ alert.attack_technique }}
-        </a>
-    </td></tr>
-    <tr><th>ATT&amp;CK Tactic</th><td>{{ alert.attack_tactic }}</td></tr>
-    <tr><th>Host</th><td>{{ alert.host }}</td></tr>
-    <tr><th>Created</th><td>{{ alert.created_at|athens_time }}</td></tr>
-    <tr><th>Details</th><td>{{ (alert.details or {}) | tojson }}</td></tr>
-</table>
-
-<form method="post" action="{{ url_for('dashboard.update_alert_status', alert_id=alert.id) }}" class="mb-4">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="status">Status:</label>
-    <select name="status" id="status">
-        {% for value, label in [("new", "New"), ("in_progress", "In Progress"), ("closed_tp", "Closed - True Positive"), ("closed_fp", "Closed - False Positive")] %}
-        <option value="{{ value }}" {% if alert.status == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit" class="btn btn-primary btn-sm">Update</button>
-</form>
-
-<form method="post" action="{{ url_for('dashboard.update_alert_notes', alert_id=alert.id) }}" class="mb-4">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="notes" class="form-label">Analyst Notes</label>
-    <textarea name="notes" id="notes" class="form-control mb-2" rows="4" maxlength="2000">{{ alert.notes or "" }}</textarea>
-    <div class="d-flex align-items-center gap-3">
-        <button type="submit" class="btn btn-success btn-sm">Save Note</button>
-        {% if alert.notes_updated_at %}
-        <small class="text-muted">Last updated: {{ alert.notes_updated_at|athens_time }}</small>
-        {% endif %}
+<div class="page-header" data-animate>
+    <div>
+        <h1 class="page-title">{{ alert.title }}</h1>
+        <p class="page-subtitle">
+            <span class="badge-pill badge-{{ alert.severity }}">{{ alert.severity }}</span>
+            on <strong>{{ alert.host }}</strong>
+        </p>
     </div>
-</form>
+    <a class="btn btn-outline-success btn-sm" href="{{ url_for('dashboard.alert_feed') }}">&larr; Back to alerts</a>
+</div>
 
-<h3>Triggering Events</h3>
-<table class="table table-sm">
-    <thead>
-        <tr>
-            <th>Time</th><th>Event Type</th><th>Direction</th><th>User</th><th>Source IP</th>
-            <th>Geo / ASN (mock)</th><th>Dest IP:Port</th><th>Remote Host</th><th>PID</th><th>Parent Process</th><th>Raw</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for event in events %}
-        <tr>
-            <td>{{ event.timestamp|athens_time }}</td>
-            <td>{{ event.event_type }}</td>
-            <td>{{ (event.details or {}).direction or "" }}</td>
-            <td>{{ event.user or "" }}</td>
-            <td>{{ event.src_ip or "" }}</td>
-            <td>
-              {% if event.enrichment and not event.enrichment.is_private and event.enrichment.country %}
-                {{ event.enrichment.country }}{% if event.enrichment.asn %} · AS{{ event.enrichment.asn }}{% endif %}
-              {% elif event.enrichment and event.enrichment.is_private %}
-                <span class="text-muted">private</span>
-              {% endif %}
-            </td>
-            <td>{% if event.dest_ip %}{{ event.dest_ip }}{% if event.details and event.details.dest_port %}:{{ event.details.dest_port }}{% endif %}{% endif %}</td>
-            <td>{{ (event.details or {}).remote_host or "" }}</td>
-            <td>{{ (event.details or {}).pid or "" }}</td>
-            <td>{{ (event.details or {}).parent_process or "" }}</td>
-            <td><code>{{ event.raw or "" }}</code></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-<a href="{{ url_for('dashboard.alert_feed') }}">&larr; Back to alerts</a>
+<div class="detail-grid">
+    <div class="panel" data-animate>
+        <div class="panel-header">Details</div>
+        <div class="panel-body">
+            <dl class="kv-grid mb-4">
+                <dt>Severity</dt><dd><span class="badge-pill badge-{{ alert.severity }}">{{ alert.severity }}</span></dd>
+                <dt>ATT&amp;CK Technique</dt>
+                <dd>
+                    <a href="https://attack.mitre.org/techniques/{{ alert.attack_technique.split('.')[0] }}/{% if '.' in alert.attack_technique %}{{ alert.attack_technique.split('.')[1] }}/{% endif %}" target="_blank" rel="noopener" class="mono">
+                        {{ alert.attack_technique }}
+                    </a>
+                </dd>
+                <dt>ATT&amp;CK Tactic</dt><dd>{{ alert.attack_tactic }}</dd>
+                <dt>Host</dt><dd>{{ alert.host }}</dd>
+                <dt>Created</dt><dd class="mono">{{ alert.created_at|athens_time }}</dd>
+                <dt>Raw Details</dt><dd><code>{{ (alert.details or {}) | tojson }}</code></dd>
+            </dl>
+
+            <form method="post" action="{{ url_for('dashboard.update_alert_status', alert_id=alert.id) }}" class="mb-4" data-loading-btn>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="status" class="form-label">Status</label>
+                <div class="d-flex gap-2">
+                    <select name="status" id="status" class="form-select">
+                        {% for value, label in [("new", "New"), ("in_progress", "In Progress"), ("closed_tp", "Closed - True Positive"), ("closed_fp", "Closed - False Positive")] %}
+                        <option value="{{ value }}" {% if alert.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                </div>
+            </form>
+
+            <form method="post" action="{{ url_for('dashboard.update_alert_notes', alert_id=alert.id) }}" data-loading-btn>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="notes" class="form-label">Analyst Notes</label>
+                <textarea name="notes" id="notes" class="form-control mb-2" rows="4" maxlength="2000">{{ alert.notes or "" }}</textarea>
+                <div class="d-flex align-items-center gap-3">
+                    <button type="submit" class="btn btn-success btn-sm">Save Note</button>
+                    {% if alert.notes_updated_at %}
+                    <small class="text-muted mono">Last updated: {{ alert.notes_updated_at|athens_time }}</small>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel" data-animate>
+        <div class="panel-header">Triggering Events</div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th><th>Event Type</th><th>Direction</th><th>User</th><th>Source IP</th>
+                        <th>Geo / ASN</th><th>Dest IP:Port</th><th>Remote Host</th><th>PID</th><th>Parent Process</th><th>Raw</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td class="mono">{{ event.timestamp|athens_time }}</td>
+                        <td>{{ event.event_type }}</td>
+                        <td>{{ (event.details or {}).direction or "" }}</td>
+                        <td>{{ event.user or "" }}</td>
+                        <td class="mono">{{ event.src_ip or "" }}</td>
+                        <td>
+                          {% if event.enrichment and not event.enrichment.is_private and event.enrichment.country %}
+                            {{ event.enrichment.country }}{% if event.enrichment.asn %} · AS{{ event.enrichment.asn }}{% endif %}
+                          {% elif event.enrichment and event.enrichment.is_private %}
+                            <span class="text-muted">private</span>
+                          {% endif %}
+                        </td>
+                        <td class="mono">{% if event.dest_ip %}{{ event.dest_ip }}{% if event.details and event.details.dest_port %}:{{ event.details.dest_port }}{% endif %}{% endif %}</td>
+                        <td>{{ (event.details or {}).remote_host or "" }}</td>
+                        <td class="mono">{{ (event.details or {}).pid or "" }}</td>
+                        <td>{{ (event.details or {}).parent_process or "" }}</td>
+                        <td><code class="truncate" title="{{ event.raw or '' }}">{{ event.raw or "" }}</code></td>
+                    </tr>
+                    {% else %}
+                    <tr class="empty-row"><td colspan="11">No triggering events recorded for this alert.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}
