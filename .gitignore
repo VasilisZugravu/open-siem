@@ -4,15 +4,11 @@ __pycache__/
 .env
 venv/
 
-# graphify build output (regenerable, contains machine-specific paths)
+# AI tooling config and generated docs - not part of the project
+CLAUDE.md
+.claude/
 graphify-out/
-
-# local Claude Code settings and worktree checkouts
-.claude/settings.local.json
-.claude/worktrees/
-.claude/council-cache/
-
-# superpowers brainstorming session files
+docs/superpowers/
 .superpowers/
 
 # downloaded/cached third-party datasets for scripts/replay_dataset.py
