@@ -170,7 +170,9 @@ def seed_demo_admin():
 
     username = os.environ.get("ADMIN_USERNAME", "admin")
     password = os.environ.get("ADMIN_PASSWORD", "demo")
-    app = create_app()
+    # Don't start a second background scheduler thread — the live server
+    # (or another seed run) already has one running against this DB.
+    app = create_app({"START_SCHEDULER": False})
     with app.app_context():
         ensure_admin(username, password)
     print(f"Seeded admin user '{username}'.")

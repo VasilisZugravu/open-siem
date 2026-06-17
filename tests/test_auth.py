@@ -73,12 +73,45 @@ def test_login_wrong_username_rerenders_form(authed_client):
     assert b"Invalid" in response.data
 
 
+def test_login_hashes_password_even_for_unknown_username(authed_client, monkeypatch):
+    """An unknown username must still pay the password-hashing cost, so a
+    timing attacker can't distinguish 'no such user' from 'wrong password'."""
+    import app.dashboard.routes as routes
+
+    calls = []
+    monkeypatch.setattr(
+        routes, "check_password_hash",
+        lambda pwhash, password: calls.append(password) or False,
+    )
+
+    authed_client.post("/login", data={"username": "no-such-user", "password": "x"})
+
+    assert calls == ["x"]
+
+
 def test_logout_clears_session_and_blocks_dashboard(authed_client):
     authed_client.post("/login", data={"username": "admin", "password": "secret"})
     authed_client.get("/logout", follow_redirects=False)
     response = authed_client.get("/")
     assert response.status_code == 302
     assert "/login" in response.headers["Location"]
+
+
+def test_ensure_admin_rejects_empty_password(authed_app):
+    """An empty ADMIN_PASSWORD env var must not silently create an
+    admin account with no password."""
+    from app.cli import ensure_admin
+    with authed_app.app_context():
+        with pytest.raises(ValueError):
+            ensure_admin("admin", "")
+
+
+def test_load_user_with_non_numeric_id_returns_none(authed_app):
+    """A stale pre-migration session cookie (old singleton stored the literal
+    string "admin" as the user id) must not crash the user_loader."""
+    from app.auth import load_user
+    with authed_app.app_context():
+        assert load_user("admin") is None
 
 
 def test_password_is_stored_hashed(authed_app):

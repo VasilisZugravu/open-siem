@@ -7,6 +7,9 @@ def ensure_admin(username, password):
     from app.db import db
     from app.models import User
 
+    if not password:
+        raise ValueError("Admin password must not be empty")
+
     user = User.query.filter_by(username=username).first()
     if user is None:
         user = User(username=username)

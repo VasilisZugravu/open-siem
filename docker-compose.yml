@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siem"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   app:
     build: .
@@ -21,10 +26,14 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    # ADMIN_USERNAME/ADMIN_PASSWORD are read directly from the environment by
+    # the create-admin CLI's envvar options — keep them out of the shell
+    # command string so a password with spaces/metacharacters can't break
+    # word-splitting or be interpreted as shell syntax.
     command: >
-      sh -c "flask --app run create-admin --username $$ADMIN_USERNAME --password $$ADMIN_PASSWORD &&
-             python run.py"
+      sh -c "flask --app run create-admin && python run.py"
 
 volumes:
   pgdata:

@@ -1,4 +1,4 @@
-from scripts.seed_demo_data import build_demo_events
+from scripts.seed_demo_data import build_demo_events, seed_demo_admin
 
 
 def test_build_demo_events_covers_all_scenarios():
@@ -30,3 +30,23 @@ def test_build_demo_events_covers_all_scenarios():
 
     dest_ports = [e.get("details", {}).get("dest_port") for e in events]
     assert 4444 in dest_ports                 # RULE-008
+
+
+def test_seed_demo_admin_does_not_start_scheduler(monkeypatch):
+    """seed_demo_admin() must opt out of the background scheduler — running
+    it against a live server would otherwise spawn a second competing
+    detection-cycle thread against the same database."""
+    import app as app_module
+
+    captured = {}
+    real_create_app = app_module.create_app
+
+    def fake_create_app(config=None):
+        captured["config"] = config
+        return real_create_app({**(config or {}), "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+
+    monkeypatch.setattr(app_module, "create_app", fake_create_app)
+
+    seed_demo_admin()
+
+    assert captured["config"]["START_SCHEDULER"] is False

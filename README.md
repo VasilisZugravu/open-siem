@@ -69,7 +69,7 @@ flask --app run create-admin --username admin
 (omit `--password` to be prompted interactively, or set `ADMIN_USERNAME` /
 `ADMIN_PASSWORD` env vars to run it non-interactively, as `docker-compose.yml`
 does on startup). `scripts/seed_demo_data.py` also seeds a demo admin
-(`admin` / `demo-password` by default, override with `ADMIN_USERNAME`/
+(`admin` / `demo` by default, override with `ADMIN_USERNAME`/
 `ADMIN_PASSWORD`) so the live demo has working credentials out of the box.
 
 ## Generating demo data

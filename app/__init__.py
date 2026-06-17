@@ -46,7 +46,8 @@ def create_app(config=None):
     with app.app_context():
         db.create_all()
 
-    if not app.config.get("TESTING"):
+    app.config.setdefault("START_SCHEDULER", not app.config.get("TESTING"))
+    if app.config.get("START_SCHEDULER"):
         from app.scheduler import start_background_loop
         start_background_loop(app)
 

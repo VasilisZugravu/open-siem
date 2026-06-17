@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app
 from flask_login import login_required, login_user, logout_user
+from werkzeug.security import check_password_hash, generate_password_hash
 from app import to_athens_time
 from app.db import db
 from app.feeds import FEEDS, feed_manager
@@ -9,6 +10,12 @@ from app.detection import RULES_DIR
 from app.detection.rules_loader import load_rules
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
+
+# Used to equalize login timing for unknown usernames — without this, a
+# missing user skips check_password's hashing entirely while a known
+# username always pays that cost, letting an attacker enumerate usernames
+# by response time.
+_DUMMY_PASSWORD_HASH = generate_password_hash("")
 
 
 @dashboard_bp.route("/")
@@ -177,7 +184,9 @@ def login():
         username = request.form.get("username", "")
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
+        if user is None:
+            check_password_hash(_DUMMY_PASSWORD_HASH, password)  # equalize timing
+        elif user.check_password(password):
             login_user(user)
             next_page = request.args.get("next") or url_for("dashboard.alert_feed")
             return redirect(next_page)
