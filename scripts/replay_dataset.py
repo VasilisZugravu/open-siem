@@ -33,6 +33,9 @@ from forwarders.windows_forwarder import map_sysmon_event
 
 DEFAULT_AUTH_LOG_URL = "https://raw.githubusercontent.com/logpai/loghub/master/OpenSSH/OpenSSH_2k.log"
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+# Same env var the live forwarders read (forwarders/*.py) — lets this script
+# authenticate against a SIEM that requires INGEST_API_KEY, same as them.
+API_KEY = os.environ.get("SIEM_API_KEY", "")
 
 PARSERS = {
     "auth": parse_auth_log_line,
@@ -78,20 +81,29 @@ def rebase_timestamps(events, step_seconds):
 
 
 def post_event(base_url, event):
-    response = requests.post(f"{base_url}/ingest", json=event)
+    headers = {"X-Api-Key": API_KEY} if API_KEY else {}
+    response = requests.post(f"{base_url}/ingest", json=event, headers=headers)
     response.raise_for_status()
     return response.json()["id"]
 
 
 def send_events(events, url_base, send_interval, retry_wait=2.0):
     """POST events in order, retrying on connection errors instead of giving up
-    (the SIEM may still be starting up when this is launched alongside it)."""
+    (the SIEM may still be starting up when this is launched alongside it).
+    A 401 means the API key is missing/wrong, not a transient outage —
+    retrying it forever would just spin; fail fast instead."""
     for event in events:
         while True:
             try:
                 event_id = post_event(url_base, event)
                 print(f"replayed {event['event_type']} on {event['host']} -> id={event_id}")
                 break
+            except requests.exceptions.HTTPError as e:
+                if e.response is not None and e.response.status_code == 401:
+                    print(f"Unauthorized (401) from {url_base}: check SIEM_API_KEY.")
+                    sys.exit(1)
+                print(f"Could not reach {url_base} ({e}); retrying in {retry_wait}s...")
+                time.sleep(retry_wait)
             except requests.exceptions.RequestException as e:
                 print(f"Could not reach {url_base} ({e}); retrying in {retry_wait}s...")
                 time.sleep(retry_wait)

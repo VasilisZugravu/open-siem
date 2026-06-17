@@ -91,10 +91,18 @@ def test_login_hashes_password_even_for_unknown_username(authed_client, monkeypa
 
 def test_logout_clears_session_and_blocks_dashboard(authed_client):
     authed_client.post("/login", data={"username": "admin", "password": "secret"})
-    authed_client.get("/logout", follow_redirects=False)
+    authed_client.post("/logout", follow_redirects=False)
     response = authed_client.get("/")
     assert response.status_code == 302
     assert "/login" in response.headers["Location"]
+
+
+def test_logout_rejects_get(authed_client):
+    """GET /logout would let any third-party page force-logout the admin via
+    e.g. <img src="/logout"> (CSRF). Logout must be a POST."""
+    authed_client.post("/login", data={"username": "admin", "password": "secret"})
+    response = authed_client.get("/logout")
+    assert response.status_code == 405
 
 
 def test_ensure_admin_rejects_empty_password(authed_app):
@@ -266,7 +274,7 @@ def test_successful_login_resets_the_attempt_counter(authed_client):
     )
     assert success.status_code == 302
 
-    authed_client.get("/logout")
+    authed_client.post("/logout")
     again = authed_client.post(
         "/login", data={"username": "admin", "password": "secret"}, follow_redirects=False
     )

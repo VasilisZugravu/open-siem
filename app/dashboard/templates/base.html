@@ -31,10 +31,13 @@
         <div class="topbar-right">
             {% block live_badge %}{% endblock %}
             {% if current_user.is_authenticated %}
-            <a class="nav-link-item" style="min-height:auto;padding:0.45rem 0.8rem;" href="{{ url_for('dashboard.logout') }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                <span>Logout</span>
-            </a>
+            <form method="post" action="{{ url_for('dashboard.logout') }}" style="display:contents;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="nav-link-item" style="min-height:auto;padding:0.45rem 0.8rem;background:none;border:none;width:auto;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    <span>Logout</span>
+                </button>
+            </form>
             {% endif %}
         </div>
     </div>

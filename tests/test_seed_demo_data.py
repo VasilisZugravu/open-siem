@@ -1,6 +1,48 @@
 from scripts.seed_demo_data import build_demo_events, seed_demo_admin
 
 
+class _FakeResponse:
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {"id": 1}
+
+
+def test_post_event_sends_api_key_header_when_configured(monkeypatch):
+    import scripts.seed_demo_data as seed_demo_data
+
+    monkeypatch.setattr(seed_demo_data, "API_KEY", "test-key")
+    captured = {}
+
+    def fake_post(url, json=None, headers=None, **kwargs):
+        captured["headers"] = headers
+        return _FakeResponse()
+
+    monkeypatch.setattr(seed_demo_data.requests, "post", fake_post)
+
+    seed_demo_data.post_event(seed_demo_data.BASE_URL, {"event_type": "x", "host": "h"})
+
+    assert captured["headers"] == {"X-Api-Key": "test-key"}
+
+
+def test_post_event_sends_no_header_when_api_key_unset(monkeypatch):
+    import scripts.seed_demo_data as seed_demo_data
+
+    monkeypatch.setattr(seed_demo_data, "API_KEY", "")
+    captured = {}
+
+    def fake_post(url, json=None, headers=None, **kwargs):
+        captured["headers"] = headers
+        return _FakeResponse()
+
+    monkeypatch.setattr(seed_demo_data.requests, "post", fake_post)
+
+    seed_demo_data.post_event(seed_demo_data.BASE_URL, {"event_type": "x", "host": "h"})
+
+    assert captured["headers"] == {}
+
+
 def test_build_demo_events_covers_all_scenarios():
     events = build_demo_events()
 

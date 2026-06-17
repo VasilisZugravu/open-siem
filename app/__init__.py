@@ -72,6 +72,30 @@ def create_app(config=None):
     db.init_app(app)
     app.jinja_env.filters["athens_time"] = to_athens_time
 
+    # Baseline hardening headers. The dashboard renders attacker-influenced
+    # event data (host, command lines, etc. from /ingest); these are
+    # defense-in-depth against XSS/clickjacking even where escaping is
+    # already correct. script-src/style-src allow the specific CDNs the
+    # templates load (Chart.js, Bootstrap, Google Fonts) plus 'unsafe-inline'
+    # for the inline <script> blocks that render server-side chart data —
+    # tightening that further would require a nonce-based rewrite of every
+    # template.
+    @app.after_request
+    def set_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "frame-ancestors 'none'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self'"
+        )
+        return response
+
     from app import models  # noqa: F401 - registers tables with SQLAlchemy
     from app.ingest import ingest_bp
     from app.dashboard.routes import dashboard_bp

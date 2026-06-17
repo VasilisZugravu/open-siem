@@ -1,6 +1,19 @@
+import os
 from datetime import datetime, timedelta
 
+import requests
+
 BASE_URL = "http://localhost:5000"
+# Same env var the live forwarders read (forwarders/*.py) — lets this script
+# authenticate against a SIEM that requires INGEST_API_KEY, same as them.
+API_KEY = os.environ.get("SIEM_API_KEY", "")
+
+
+def post_event(base_url, event):
+    headers = {"X-Api-Key": API_KEY} if API_KEY else {}
+    response = requests.post(f"{base_url}/ingest", json=event, headers=headers)
+    response.raise_for_status()
+    return response.json()["id"]
 
 
 def build_demo_events():
@@ -180,16 +193,14 @@ def seed_demo_admin():
 
 def main():
     import sys
-    import requests
 
     seed_demo_admin()
 
     events = build_demo_events()
     try:
         for event in events:
-            response = requests.post(f"{BASE_URL}/ingest", json=event)
-            response.raise_for_status()
-            print(f"ingested {event['event_type']} on {event['host']} -> id={response.json()['id']}")
+            event_id = post_event(BASE_URL, event)
+            print(f"ingested {event['event_type']} on {event['host']} -> id={event_id}")
     except requests.exceptions.RequestException as e:
         print(f"Error: could not reach {BASE_URL} ({e}). Is the app running? Try `python run.py` first.")
         sys.exit(1)

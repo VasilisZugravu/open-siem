@@ -193,6 +193,124 @@ def test_single_event_rule_does_not_fire_duplicate_if_open_alert_exists(app):
     assert Alert.query.count() == 1  # no new alert created
 
 
+def test_single_event_rule_fires_again_after_cooldown_elapses_even_if_alert_still_open(app):
+    """Dedup must be time-bounded: an un-triaged ('new') alert should not
+    suppress detections forever once the cooldown window has passed."""
+    from datetime import datetime, timedelta
+    from app.db import db
+    from app.models import Alert, Event
+    from app.detection.engine import evaluate_single_event_rules
+
+    rule = {
+        "id": "RULE-DUP3",
+        "title": "Dup Test 3",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "event_type": "lsass_access",
+            "conditions": {},
+        },
+    }
+
+    old_alert = Alert(
+        rule_id="RULE-DUP3", title="Dup Test 3", severity="high",
+        attack_technique="T9999", attack_tactic="Testing",
+        host="win-vm", status="new",
+        triggering_event_ids=[], details={},
+        created_at=datetime.utcnow() - timedelta(hours=2),
+    )
+    db.session.add(old_alert)
+    db.session.commit()
+
+    e = Event(timestamp=datetime.utcnow(), host="win-vm", event_type="lsass_access")
+    db.session.add(e)
+    db.session.commit()
+
+    evaluate_single_event_rules([rule])
+
+    db.session.expire_all()
+    assert Alert.query.count() == 2  # cooldown elapsed, so a new alert fires
+
+
+def test_single_event_rule_fires_for_different_entity_despite_open_alert(app):
+    """Dedup should key on the triggering entity (e.g. src_ip), not just
+    rule+host — a different attacker on the same host must still alert."""
+    from datetime import datetime
+    from app.db import db
+    from app.models import Alert, Event
+    from app.detection.engine import evaluate_single_event_rules
+
+    rule = {
+        "id": "RULE-DUP4",
+        "title": "Dup Test 4",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "event_type": "network_connection",
+            "conditions": {},
+        },
+    }
+
+    existing = Alert(
+        rule_id="RULE-DUP4", title="Dup Test 4", severity="high",
+        attack_technique="T9999", attack_tactic="Testing",
+        host="win-vm", status="new",
+        triggering_event_ids=[], details={"src_ip": "1.1.1.1"},
+    )
+    db.session.add(existing)
+    db.session.commit()
+
+    e = Event(
+        timestamp=datetime.utcnow(), host="win-vm",
+        event_type="network_connection", src_ip="2.2.2.2",
+    )
+    db.session.add(e)
+    db.session.commit()
+
+    evaluate_single_event_rules([rule])
+
+    db.session.expire_all()
+    assert Alert.query.count() == 2  # different src_ip, must not be suppressed
+
+
+def test_aggregation_rule_cooldown_outlasts_detection_window(app):
+    """The cooldown that prevents re-firing must outlast the detection window
+    itself — otherwise a continuous attack re-alerts every window."""
+    from datetime import timedelta
+
+    base = datetime.utcnow()
+    _add_failed_logins(5, base_time=base)
+    evaluate_aggregation_rules([SSH_BRUTE_FORCE_RULE], now=base + timedelta(seconds=5))
+    assert Alert.query.count() == 1
+
+    # 70s later: outside the 60s detection window, but the attack is ongoing.
+    _add_failed_logins(5, base_time=base + timedelta(seconds=70))
+    evaluate_aggregation_rules([SSH_BRUTE_FORCE_RULE], now=base + timedelta(seconds=75))
+    assert Alert.query.count() == 1  # still suppressed by the longer cooldown
+
+
+def test_aggregation_rule_skips_events_with_missing_group_by_field(app):
+    """Events missing the group_by field (group_value=None) must not be
+    bucketed together into a bogus alert."""
+    from datetime import timedelta
+
+    base = datetime.utcnow()
+    for i in range(5):
+        db.session.add(Event(
+            timestamp=base + timedelta(seconds=i),
+            host="linux-vm",
+            event_type="auth_failure",
+            details={"service": "sshd"},  # no src_ip
+        ))
+    db.session.commit()
+
+    evaluate_aggregation_rules([SSH_BRUTE_FORCE_RULE], now=base + timedelta(seconds=5))
+
+    assert Alert.query.count() == 0
+
+
 def test_single_event_rule_fires_again_after_alert_closed(app):
     """Status-gate allows re-firing once the existing alert is closed."""
     from datetime import datetime

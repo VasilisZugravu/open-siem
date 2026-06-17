@@ -6,6 +6,7 @@ with an occasional attack scenario mixed in. Useful for watching the dashboard u
 live instead of staring at a static snapshot.
 """
 import argparse
+import os
 import random
 import sys
 import time
@@ -14,6 +15,9 @@ from datetime import datetime, timedelta
 import requests
 
 BASE_URL = "http://localhost:5000"
+# Same env var the live forwarders read (forwarders/*.py) — lets this script
+# authenticate against a SIEM that requires INGEST_API_KEY, same as them.
+API_KEY = os.environ.get("SIEM_API_KEY", "")
 
 HOSTS = ["linux-vm", "win-vm", "db-01", "web-02"]
 LINUX_USERS = ["alice", "bob", "carol"]
@@ -292,8 +296,9 @@ def build_tick_events(attack_prob):
 
 
 def post_events(base_url, events):
+    headers = {"X-Api-Key": API_KEY} if API_KEY else {}
     for event in events:
-        response = requests.post(f"{base_url}/ingest", json=event)
+        response = requests.post(f"{base_url}/ingest", json=event, headers=headers)
         response.raise_for_status()
         print(f"ingested {event['event_type']} on {event['host']} -> id={response.json()['id']}")
 

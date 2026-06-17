@@ -3,6 +3,48 @@ import re
 from scripts.simulate_traffic import ATTACK_SCENARIOS, build_benign_events
 
 
+class _FakeResponse:
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {"id": 1}
+
+
+def test_post_events_sends_api_key_header_when_configured(monkeypatch):
+    import scripts.simulate_traffic as simulate_traffic
+
+    monkeypatch.setattr(simulate_traffic, "API_KEY", "test-key")
+    captured = {}
+
+    def fake_post(url, json=None, headers=None, **kwargs):
+        captured["headers"] = headers
+        return _FakeResponse()
+
+    monkeypatch.setattr(simulate_traffic.requests, "post", fake_post)
+
+    simulate_traffic.post_events(simulate_traffic.BASE_URL, [{"event_type": "x", "host": "h"}])
+
+    assert captured["headers"] == {"X-Api-Key": "test-key"}
+
+
+def test_post_events_sends_no_header_when_api_key_unset(monkeypatch):
+    import scripts.simulate_traffic as simulate_traffic
+
+    monkeypatch.setattr(simulate_traffic, "API_KEY", "")
+    captured = {}
+
+    def fake_post(url, json=None, headers=None, **kwargs):
+        captured["headers"] = headers
+        return _FakeResponse()
+
+    monkeypatch.setattr(simulate_traffic.requests, "post", fake_post)
+
+    simulate_traffic.post_events(simulate_traffic.BASE_URL, [{"event_type": "x", "host": "h"}])
+
+    assert captured["headers"] == {}
+
+
 def _matches_attack_signature(event):
     """True if event would trip any rule signature exercised by ATTACK_SCENARIOS."""
     command_line = (event.get("command_line") or "").lower()

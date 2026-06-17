@@ -129,6 +129,36 @@ def test_sequence_cooldown_prevents_second_alert_in_same_window(app):
     assert Alert.query.count() == 1
 
 
+def test_sequence_skips_events_missing_correlate_by_field(app):
+    """If the correlate_by field is absent on a step-1 event (corr_val=None),
+    it must not be matched against other events that also lack the field —
+    otherwise unrelated events get linked into a bogus alert."""
+    rule_by_user = {
+        "id": "RULE-TEST-SEQ-USER",
+        "title": "Test Sequence Rule by user",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "sequence": [
+                {"event_type": "step_one", "conditions": {}},
+                {"event_type": "step_two", "conditions": {}},
+            ],
+            "correlate_by": "user",
+            "timeframe_seconds": 600,
+        },
+    }
+    # Neither event sets `user`, so correlate_by resolves to None on both.
+    _event("host-a", "step_one", _BASE)
+    _event("host-a", "step_two", _BASE + timedelta(seconds=30))
+    now = _BASE + timedelta(seconds=60)
+
+    evaluate_sequence_rules([rule_by_user], now=now)
+
+    db.session.expire_all()
+    assert Alert.query.count() == 0
+
+
 # ── Integration test: end-to-end via run_one_cycle ───────────────────────────
 
 def test_sequence_rule_fires_via_run_one_cycle(app, monkeypatch, tmp_path):

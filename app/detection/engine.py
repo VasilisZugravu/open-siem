@@ -3,6 +3,19 @@ from app.db import db
 from app.models import Event, Alert, EngineState
 from app.detection.operators import match_conditions
 
+# How long an open (new/in_progress) alert suppresses a new single-event alert
+# for the same rule+host+entity. Without a bound, an un-triaged alert blinds
+# the rule forever; this caps that to a sane window while still avoiding
+# alert-spam for an attack that's still actively unfolding.
+SINGLE_EVENT_DEDUP_COOLDOWN_SECONDS = 3600
+
+# Cooldown that prevents an aggregation rule from re-firing for the same
+# group while an alert for it is still recent. Deliberately independent of
+# the rule's own detection `timeframe_seconds` — tying the two together means
+# a continuous attack re-alerts every time the window slides past the first
+# alert's created_at, which is exactly the failure mode this constant avoids.
+AGGREGATION_COOLDOWN_SECONDS = 1800
+
 
 def event_to_dict(event):
     """Flatten an Event into a dict for rule matching, merging `details` fields
@@ -32,9 +45,11 @@ def _get_engine_state():
     return state
 
 
-def evaluate_single_event_rules(rules):
+def evaluate_single_event_rules(rules, now=None):
     """Check events added since the last cycle against rules with no aggregation block.
-    Each matching event creates exactly one alert."""
+    Each matching event creates exactly one alert, unless a recent open alert
+    for the same rule+host+entity (src_ip, when present) already covers it."""
+    now = now or datetime.utcnow()
     state = _get_engine_state()
     new_events = (
         Event.query.filter(Event.id > state.last_processed_event_id)
@@ -43,10 +58,12 @@ def evaluate_single_event_rules(rules):
     )
 
     max_id = state.last_processed_event_id
+    dedup_window_start = now - timedelta(seconds=SINGLE_EVENT_DEDUP_COOLDOWN_SECONDS)
 
     for event in new_events:
         max_id = max(max_id, event.id)
         event_dict = event_to_dict(event)
+        entity_key = event_dict.get("src_ip")
 
         for rule in rules:
             detection = rule["detection"]
@@ -59,12 +76,13 @@ def evaluate_single_event_rules(rules):
             if not match_conditions(event_dict, detection.get("conditions", {})):
                 continue
 
-            open_exists = Alert.query.filter(
+            open_alerts = Alert.query.filter(
                 Alert.rule_id == rule["id"],
                 Alert.host == event_dict.get("host"),
                 Alert.status.in_(["new", "in_progress"]),
-            ).first()
-            if open_exists:
+                Alert.created_at >= dedup_window_start,
+            ).all()
+            if any((a.details or {}).get("src_ip") == entity_key for a in open_alerts):
                 continue
 
             db.session.add(Alert(
@@ -76,7 +94,7 @@ def evaluate_single_event_rules(rules):
                 host=event.host,
                 status="new",
                 triggering_event_ids=[event.id],
-                details={},
+                details={"src_ip": entity_key},
             ))
 
     state.last_processed_event_id = max_id
@@ -109,11 +127,16 @@ def evaluate_aggregation_rules(rules, now=None):
         groups = {}
         for event in matching:
             group_value = event_to_dict(event).get(agg["group_by"])
+            if group_value is None:
+                # Can't attribute this event to any group — bucketing it under
+                # a shared `None` key would collapse unrelated events together.
+                continue
             groups.setdefault(group_value, []).append(event)
 
+        cooldown_start = now - timedelta(seconds=AGGREGATION_COOLDOWN_SECONDS)
         recent_alerts = Alert.query.filter(
             Alert.rule_id == rule["id"],
-            Alert.created_at >= window_start,
+            Alert.created_at >= cooldown_start,
         ).all()
         already_alerted = {a.details.get(agg["group_by"]) for a in recent_alerts}
 
@@ -177,6 +200,11 @@ def evaluate_sequence_rules(rules, now=None):
 
         for e1 in step1_matching:
             corr_val = event_to_dict(e1).get(correlate_by)
+            if corr_val is None:
+                # Can't correlate this event to anything specific — matching
+                # it against other events that also lack the field would
+                # link unrelated activity into a bogus alert.
+                continue
             if corr_val in already_alerted:
                 continue
 
@@ -220,6 +248,6 @@ def evaluate_sequence_rules(rules, now=None):
 def run_detection_cycle(rules):
     """Run one full detection pass: single-event rules, aggregation rules, then sequence rules."""
     now = datetime.utcnow()
-    evaluate_single_event_rules(rules)
+    evaluate_single_event_rules(rules, now=now)
     evaluate_aggregation_rules(rules, now=now)
     evaluate_sequence_rules(rules, now=now)

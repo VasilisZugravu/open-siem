@@ -362,7 +362,7 @@ def login():
     return render_template("login.html")
 
 
-@dashboard_bp.route("/logout")
+@dashboard_bp.route("/logout", methods=["POST"])
 def logout():
     logout_user()
     return redirect(url_for("dashboard.login"))
