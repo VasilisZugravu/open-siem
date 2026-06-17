@@ -154,6 +154,15 @@ This polls `/api/alerts` for each rule and writes results to
 RULE-010 and RULE-011 are deliberate alternate-path coverage, not duplicate rules —
 see [docs/false-positives.md](docs/false-positives.md) for the evasion each one closes.
 
+## Playbooks and hunting
+
+- **[playbooks/](playbooks/)** — one incident-response playbook per rule
+  (triage, investigation, containment, escalation, closure criteria).
+- **[hunting/](hunting/)** — proactive SQL hunts for activity the 12 rules
+  don't cover (LOLBin use outside known flag combos, rare process lineage,
+  off-hours privileged commands, beaconing on arbitrary ports, cross-host
+  rule fan-out).
+
 ## Testing
 
 ```bash
