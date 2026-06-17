@@ -161,9 +161,26 @@ def build_demo_events():
     return events
 
 
+def seed_demo_admin():
+    """Ensure a demo admin account exists so the live demo has working
+    credentials without a manual `flask create-admin` step."""
+    import os
+    from app import create_app
+    from app.cli import ensure_admin
+
+    username = os.environ.get("ADMIN_USERNAME", "admin")
+    password = os.environ.get("ADMIN_PASSWORD", "demo")
+    app = create_app()
+    with app.app_context():
+        ensure_admin(username, password)
+    print(f"Seeded admin user '{username}'.")
+
+
 def main():
     import sys
     import requests
+
+    seed_demo_admin()
 
     events = build_demo_events()
     try:

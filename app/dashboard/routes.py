@@ -4,7 +4,7 @@ from flask_login import login_required, login_user, logout_user
 from app import to_athens_time
 from app.db import db
 from app.feeds import FEEDS, feed_manager
-from app.models import Alert, Event
+from app.models import Alert, Event, User
 from app.detection import RULES_DIR
 from app.detection.rules_loader import load_rules
 
@@ -173,15 +173,12 @@ def event_explorer():
 
 @dashboard_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if not current_app.config.get("DASHBOARD_PASSWORD"):
-        return redirect(url_for("dashboard.alert_feed"))
     if request.method == "POST":
         username = request.form.get("username", "")
         password = request.form.get("password", "")
-        if (username == current_app.config.get("DASHBOARD_USER", "admin")
-                and password == current_app.config["DASHBOARD_PASSWORD"]):
-            from app.auth import _admin
-            login_user(_admin)
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user)
             next_page = request.args.get("next") or url_for("dashboard.alert_feed")
             return redirect(next_page)
         flash("Invalid username or password.")

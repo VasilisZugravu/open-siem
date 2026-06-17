@@ -1,21 +1,22 @@
 import pytest
 from app import create_app
+from app.cli import ensure_admin
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def authed_app():
-    """App with DASHBOARD_PASSWORD set — auth enforced."""
+    """App with the admin seeded and an INGEST_API_KEY configured, for the
+    /api/alerts key-guard tests."""
     app = create_app({
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "TESTING": True,
-        "DASHBOARD_USER": "admin",
-        "DASHBOARD_PASSWORD": "secret",
         "INGEST_API_KEY": "test-secret",
         "SECRET_KEY": "test-secret-key",
     })
     with app.app_context():
+        ensure_admin("admin", "secret")
         yield app
 
 
@@ -24,15 +25,7 @@ def authed_client(authed_app):
     return authed_app.test_client()
 
 
-# ── Auth-disabled (no DASHBOARD_PASSWORD) ───────────────────────────────────
-
-def test_auth_disabled_allows_dashboard(client):
-    """When DASHBOARD_PASSWORD is not set, / returns 200 without any login."""
-    response = client.get("/")
-    assert response.status_code == 200
-
-
-# ── Auth-enabled (DASHBOARD_PASSWORD set) ───────────────────────────────────
+# ── Login is always required ────────────────────────────────────────────────
 
 def test_unauthenticated_get_redirects_to_login(authed_client):
     response = authed_client.get("/")
@@ -88,11 +81,13 @@ def test_logout_clears_session_and_blocks_dashboard(authed_client):
     assert "/login" in response.headers["Location"]
 
 
-def test_login_when_auth_disabled_redirects_to_feed(client):
-    """When DASHBOARD_PASSWORD is not set, /login immediately redirects to /."""
-    response = client.get("/login", follow_redirects=False)
-    assert response.status_code == 302
-    assert response.headers["Location"] == "/"
+def test_password_is_stored_hashed(authed_app):
+    from app.models import User
+    with authed_app.app_context():
+        user = User.query.filter_by(username="admin").first()
+        assert user.password_hash != "secret"
+        assert user.check_password("secret")
+        assert not user.check_password("wrong")
 
 
 # ── /api/alerts key guard ────────────────────────────────────────────────────

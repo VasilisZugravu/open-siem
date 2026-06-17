@@ -114,6 +114,7 @@ def test_event_explorer_shows_country_for_enriched_event(app):
     from app.enrichment import enrich_ip
 
     client = app.test_client()
+    client.post("/login", data={"username": "admin", "password": "secret"})
     src_ip = "1.1.1.1"
     client.post("/ingest", json={
         "timestamp": datetime.utcnow().isoformat(),

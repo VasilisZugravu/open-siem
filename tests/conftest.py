@@ -1,5 +1,6 @@
 import pytest
 from app import create_app
+from app.cli import ensure_admin
 from app.db import db
 
 
@@ -10,24 +11,28 @@ def app():
         "TESTING": True,
     })
     with app.app_context():
+        ensure_admin("admin", "secret")
         yield app
 
 
 @pytest.fixture
-def client(app):
+def anon_client(app):
+    """Unauthenticated client — used for login-redirect/login-flow tests."""
     return app.test_client()
 
 
 @pytest.fixture
-def authed_app():
-    """App with DASHBOARD_PASSWORD set — auth enforced."""
-    app = create_app({
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-        "DASHBOARD_USER": "admin",
-        "DASHBOARD_PASSWORD": "secret",
-        "INGEST_API_KEY": "test-secret",
-        "SECRET_KEY": "test-secret-key",
-    })
-    with app.app_context():
-        yield app
+def client(app):
+    """Logged-in client. Login is always required, so most tests that exercise
+    dashboard routes need a session; the few that test the auth flow itself use
+    anon_client instead."""
+    client = app.test_client()
+    client.post("/login", data={"username": "admin", "password": "secret"})
+    return client
+
+
+@pytest.fixture
+def authed_app(app):
+    """Back-compat alias: auth is always enforced now, so this is just `app`
+    with the admin seeded."""
+    return app

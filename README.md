@@ -56,6 +56,22 @@ By default this uses a local SQLite database file (`siem.db`). Set the
 export DATABASE_URL=postgresql://siem:siem@localhost:5432/siem
 ```
 
+## Dashboard login
+
+The dashboard is gated behind a login page (Flask-Login) — there is no
+public signup. The single admin account is stored in the database with a
+hashed password and is created/updated via a Flask CLI command:
+
+```bash
+flask --app run create-admin --username admin
+```
+
+(omit `--password` to be prompted interactively, or set `ADMIN_USERNAME` /
+`ADMIN_PASSWORD` env vars to run it non-interactively, as `docker-compose.yml`
+does on startup). `scripts/seed_demo_data.py` also seeds a demo admin
+(`admin` / `demo-password` by default, override with `ADMIN_USERNAME`/
+`ADMIN_PASSWORD`) so the live demo has working credentials out of the box.
+
 ## Generating demo data
 
 With the app running, seed synthetic events covering all detection rules:

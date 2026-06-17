@@ -1,4 +1,6 @@
 from datetime import datetime
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import db
 
 
@@ -46,3 +48,20 @@ class EngineState(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     last_processed_event_id = db.Column(db.Integer, nullable=False, default=0)
+
+
+class User(UserMixin, db.Model):
+    """Single admin account used to log in to the dashboard. Created/updated via
+    the `flask create-admin` CLI command (see app/cli.py) or the demo seed script
+    — there is no public signup."""
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
