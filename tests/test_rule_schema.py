@@ -10,7 +10,7 @@ def test_all_rules_pass_schema_validation():
     """Engineering-rigor check: every rule in rules/ must satisfy the strict schema."""
     rules = load_rules(RULES_DIR)
     validated = validate_rules(rules)
-    assert len(validated) == 12
+    assert len(validated) == 13
 
 
 def test_rejects_bad_severity():

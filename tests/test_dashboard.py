@@ -1,5 +1,7 @@
 from datetime import datetime
+import pytest
 from app.db import db
+from app.feeds import feed_manager
 from app.models import Alert, Event
 
 
@@ -243,3 +245,65 @@ def test_event_explorer_filters_by_search(client):
     assert response.status_code == 200
     assert b"-enc" in response.data
     assert b"/c dir" not in response.data
+
+
+class _FakeFeedProcess:
+    def __init__(self):
+        self._terminated = False
+
+    def poll(self):
+        return None if not self._terminated else 0
+
+    def terminate(self):
+        self._terminated = True
+
+
+@pytest.fixture(autouse=True)
+def _isolated_feed_manager(monkeypatch):
+    """Feed routes use the app.feeds singleton; fake Popen and reset its state
+    around each test so feed control tests don't spawn real processes or leak
+    state into other tests in the same session."""
+    monkeypatch.setattr("app.feeds.subprocess.Popen", lambda *a, **k: _FakeFeedProcess())
+    feed_manager.stop_all()
+    yield
+    feed_manager.stop_all()
+
+
+def test_alert_feed_shows_feed_control_panel(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"Machine Monitor" in response.data
+    assert b"Real Incident Logs" in response.data
+    assert b"Synthetic Traffic" in response.data
+    assert b"Stopped" in response.data
+
+
+def test_start_feed(client):
+    response = client.post("/feeds/machine/start")
+
+    assert response.status_code == 302
+    assert feed_manager.is_running("machine")
+
+
+def test_stop_feed(client):
+    client.post("/feeds/machine/start")
+    response = client.post("/feeds/machine/stop")
+
+    assert response.status_code == 302
+    assert not feed_manager.is_running("machine")
+
+
+def test_start_unknown_feed_flashes_error(client):
+    response = client.post("/feeds/nonexistent/start", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Unknown feed" in response.data
+
+
+def test_feed_panel_reflects_running_state(client):
+    client.post("/feeds/incidents/start")
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"Running" in response.data

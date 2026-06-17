@@ -1,6 +1,20 @@
 import os
+from datetime import timezone
+from zoneinfo import ZoneInfo
+
 from flask import Flask
 from app.db import db
+
+ATHENS_TZ = ZoneInfo("Europe/Athens")
+
+
+def to_athens_time(value, fmt="%Y-%m-%d %H:%M:%S"):
+    """Render a UTC-naive datetime (as stored in the DB) in Athens local time."""
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(ATHENS_TZ).strftime(fmt)
 
 
 def create_app(config=None):
@@ -18,6 +32,7 @@ def create_app(config=None):
         app.config.update(config)
 
     db.init_app(app)
+    app.jinja_env.filters["athens_time"] = to_athens_time
 
     from app import models  # noqa: F401 - registers tables with SQLAlchemy
     from app.ingest import ingest_bp

@@ -1,0 +1,15 @@
+id: RULE-013
+title: Inbound Connection from External Host
+description: >
+  An external (public-internet) host established an inbound network connection to
+  this machine - i.e. something on the internet connected in, rather than this PC
+  connecting out. Possible remote access, scanning follow-up, or backdoor callback.
+severity: medium
+attack_technique: T1133
+attack_tactic: Initial Access
+detection:
+  event_type: network_connection
+  conditions:
+    direction: inbound
+    external: true
+tags: [network, inbound, ids]

@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app
 from flask_login import login_required, login_user, logout_user
+from app import to_athens_time
 from app.db import db
+from app.feeds import FEEDS, feed_manager
 from app.models import Alert, Event
 from app.detection import RULES_DIR
 from app.detection.rules_loader import load_rules
@@ -19,7 +21,7 @@ def alert_feed():
 
     hourly_counts = {}
     for alert in recent_alerts:
-        bucket = alert.created_at.strftime("%Y-%m-%d %H:00")
+        bucket = to_athens_time(alert.created_at, "%Y-%m-%d %H:00")
         hourly_counts[bucket] = hourly_counts.get(bucket, 0) + 1
     hourly_labels = sorted(hourly_counts.keys())
     hourly_values = [hourly_counts[label] for label in hourly_labels]
@@ -28,6 +30,8 @@ def alert_feed():
     for alert in Alert.query.all():
         severity_counts[alert.severity] = severity_counts.get(alert.severity, 0) + 1
 
+    feed_status = feed_manager.status()
+
     return render_template(
         "alert_feed.html",
         alerts=alerts,
@@ -35,7 +39,33 @@ def alert_feed():
         hourly_values=hourly_values,
         severity_labels=list(severity_counts.keys()),
         severity_values=list(severity_counts.values()),
+        feeds=FEEDS,
+        feed_status=feed_status,
     )
+
+
+@dashboard_bp.route("/feeds/<name>/start", methods=["POST"])
+@login_required
+def start_feed(name):
+    if name not in FEEDS:
+        flash(f"Unknown feed: {name}")
+    elif feed_manager.start(name):
+        flash(f"Started {FEEDS[name]['label']}.")
+    else:
+        flash(f"{FEEDS[name]['label']} is already running.")
+    return redirect(request.referrer or url_for("dashboard.alert_feed"))
+
+
+@dashboard_bp.route("/feeds/<name>/stop", methods=["POST"])
+@login_required
+def stop_feed(name):
+    if name not in FEEDS:
+        flash(f"Unknown feed: {name}")
+    elif feed_manager.stop(name):
+        flash(f"Stopped {FEEDS[name]['label']}.")
+    else:
+        flash(f"{FEEDS[name]['label']} is not running.")
+    return redirect(request.referrer or url_for("dashboard.alert_feed"))
 
 
 @dashboard_bp.route("/alerts/<int:alert_id>")

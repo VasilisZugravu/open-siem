@@ -11,7 +11,7 @@
     </td></tr>
     <tr><th>ATT&amp;CK Tactic</th><td>{{ alert.attack_tactic }}</td></tr>
     <tr><th>Host</th><td>{{ alert.host }}</td></tr>
-    <tr><th>Created</th><td>{{ alert.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td></tr>
+    <tr><th>Created</th><td>{{ alert.created_at|athens_time }}</td></tr>
     <tr><th>Details</th><td>{{ (alert.details or {}) | tojson }}</td></tr>
 </table>
 
@@ -31,7 +31,7 @@
     <div class="d-flex align-items-center gap-3">
         <button type="submit" class="btn btn-success btn-sm">Save Note</button>
         {% if alert.notes_updated_at %}
-        <small class="text-muted">Last updated: {{ alert.notes_updated_at.strftime("%Y-%m-%d %H:%M:%S") }}</small>
+        <small class="text-muted">Last updated: {{ alert.notes_updated_at|athens_time }}</small>
         {% endif %}
     </div>
 </form>
@@ -40,15 +40,16 @@
 <table class="table table-sm">
     <thead>
         <tr>
-            <th>Time</th><th>Event Type</th><th>User</th><th>Source IP</th>
-            <th>Geo / ASN (mock)</th><th>Dest IP:Port</th><th>PID</th><th>Parent Process</th><th>Raw</th>
+            <th>Time</th><th>Event Type</th><th>Direction</th><th>User</th><th>Source IP</th>
+            <th>Geo / ASN (mock)</th><th>Dest IP:Port</th><th>Remote Host</th><th>PID</th><th>Parent Process</th><th>Raw</th>
         </tr>
     </thead>
     <tbody>
         {% for event in events %}
         <tr>
-            <td>{{ event.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>{{ event.timestamp|athens_time }}</td>
             <td>{{ event.event_type }}</td>
+            <td>{{ (event.details or {}).direction or "" }}</td>
             <td>{{ event.user or "" }}</td>
             <td>{{ event.src_ip or "" }}</td>
             <td>
@@ -59,6 +60,7 @@
               {% endif %}
             </td>
             <td>{% if event.dest_ip %}{{ event.dest_ip }}{% if event.details and event.details.dest_port %}:{{ event.details.dest_port }}{% endif %}{% endif %}</td>
+            <td>{{ (event.details or {}).remote_host or "" }}</td>
             <td>{{ (event.details or {}).pid or "" }}</td>
             <td>{{ (event.details or {}).parent_process or "" }}</td>
             <td><code>{{ event.raw or "" }}</code></td>

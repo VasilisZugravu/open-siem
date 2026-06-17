@@ -77,8 +77,13 @@ Two ways to feed the SIEM genuine (non-synthetic) telemetry:
 
 **This machine's real activity** — `forwarders/host_forwarder.py` uses
 [`psutil`](https://pypi.org/project/psutil/) to watch this PC's actual
-processes and outbound network connections (no admin rights, no Sysmon
-required) and forwards anything new:
+processes and network connections, **both outbound (this PC connecting out)
+and inbound (a peer connecting in to one of our listening ports)** — no admin
+rights, no Sysmon required — and forwards anything new. Pure loopback traffic
+(127.0.0.1/::1) is skipped as noise; known C2 ports (4444/4445) are always
+captured. Each connection's remote IP is reverse-DNS resolved (cached) so you
+see e.g. `chrome.exe → *.googlevideo.com:443` instead of just an IP, and
+RULE-013 fires when an external host connects in:
 
 ```bash
 pip install -r forwarders/requirements-windows.txt   # installs psutil (and pywin32 on Windows)
@@ -103,7 +108,19 @@ python -m scripts.replay_dataset --limit 200
 
 Timestamps are rebased to "now" (`--no-rebase` to disable) so the
 aggregation/sequence rules actually fire on replay. `--source sysmon`
-supports replaying your own real Sysmon EventXML export via `--file`.
+supports replaying your own real Sysmon EventXML export via `--file`. Pass
+`--loop` to replay the dataset on repeat forever instead of exiting once
+exhausted.
+
+## Controlling telemetry feeds from the dashboard
+
+The three feeds above (Machine Monitor, Real Incident Logs, Synthetic
+Traffic) can each be started/stopped independently from a control panel on
+the main dashboard (http://localhost:5000/) — no command line needed. None
+of them run by default; the SIEM starts as a clean slate and you opt into
+whichever feed(s) you want, e.g. just Machine Monitor to watch this PC, or
+add Real Incident Logs/Synthetic Traffic on top to also exercise the rest of
+the rule set.
 
 ## Attack Lab
 
@@ -184,15 +201,16 @@ This polls `/api/alerts` for each rule and writes results to
 | 10 | LSASS dump via comsvcs.dll (rundll32 LOLBin, no procdump needed) | RULE-010 | T1003.001 | Credential Access | Single event |
 | 11 | Encoded PowerShell, case/long-form evasion of RULE-004 | RULE-011 | T1059.001 | Execution | Single event |
 | 12 | certutil -decode used to stage a decoded payload | RULE-012 | T1140 | Defense Evasion | Single event |
+| 13 | Inbound connection from an external host to a listening port | RULE-013 | T1133 | Initial Access | Single event |
 
 RULE-010 and RULE-011 are deliberate alternate-path coverage, not duplicate rules —
 see [docs/false-positives.md](docs/false-positives.md) for the evasion each one closes.
 
 ## Playbooks and hunting
 
-- **[playbooks/](playbooks/)** — 12 incident-response playbooks, one per rule
+- **[playbooks/](playbooks/)** — 13 incident-response playbooks, one per rule
   (triage, investigation, containment, escalation, closure criteria).
-- **[hunting/](hunting/)** — 5 proactive SQL hunts for activity the 12 rules
+- **[hunting/](hunting/)** — 5 proactive SQL hunts for activity the 13 rules
   don't cover (LOLBin use outside known flag combos, rare process lineage,
   off-hours privileged commands, beaconing on arbitrary ports, cross-host
   rule fan-out).

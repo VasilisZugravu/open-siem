@@ -23,6 +23,7 @@ aggregation/sequence rules (which only look at recent events) actually fire on r
 import argparse
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -82,6 +83,22 @@ def post_event(base_url, event):
     return response.json()["id"]
 
 
+def send_events(events, url_base, send_interval, retry_wait=2.0):
+    """POST events in order, retrying on connection errors instead of giving up
+    (the SIEM may still be starting up when this is launched alongside it)."""
+    for event in events:
+        while True:
+            try:
+                event_id = post_event(url_base, event)
+                print(f"replayed {event['event_type']} on {event['host']} -> id={event_id}")
+                break
+            except requests.exceptions.RequestException as e:
+                print(f"Could not reach {url_base} ({e}); retrying in {retry_wait}s...")
+                time.sleep(retry_wait)
+        if send_interval:
+            time.sleep(send_interval)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Replay a real captured log dataset into the SIEM.")
     parser.add_argument("--source", choices=["auth", "sysmon"], default="auth")
@@ -92,6 +109,7 @@ def main():
     parser.add_argument("--timestamp-step", type=float, default=2.0, help="seconds between consecutive rebased event timestamps (default 2.0)")
     parser.add_argument("--send-interval", type=float, default=0.3, help="seconds to sleep between actual POST requests (default 0.3)")
     parser.add_argument("--url-base", default="http://localhost:5000", help="SIEM base URL (default http://localhost:5000)")
+    parser.add_argument("--loop", action="store_true", help="replay the dataset on repeat forever instead of exiting once it's exhausted")
     args = parser.parse_args()
 
     if args.file:
@@ -108,19 +126,19 @@ def main():
     events = parse_events(lines, args.source)
     print(f"Parsed {len(events)} usable events out of {len(lines)} raw lines.")
 
-    if not args.no_rebase:
-        events = rebase_timestamps(events, args.timestamp_step)
-
     try:
-        for event in events:
-            event_id = post_event(args.url_base, event)
-            print(f"replayed {event['event_type']} on {event['host']} -> id={event_id}")
-            if args.send_interval:
-                import time
-                time.sleep(args.send_interval)
-    except requests.exceptions.RequestException as e:
-        print(f"Error: could not reach {args.url_base} ({e}). Is the app running? Try `python run.py` first.")
-        sys.exit(1)
+        if args.loop:
+            while True:
+                pass_events = list(events)
+                if not args.no_rebase:
+                    pass_events = rebase_timestamps(pass_events, args.timestamp_step)
+                send_events(pass_events, args.url_base, args.send_interval)
+                print("Dataset exhausted, looping...")
+        else:
+            pass_events = events
+            if not args.no_rebase:
+                pass_events = rebase_timestamps(pass_events, args.timestamp_step)
+            send_events(pass_events, args.url_base, args.send_interval)
     except KeyboardInterrupt:
         print("\nStopped.")
 
