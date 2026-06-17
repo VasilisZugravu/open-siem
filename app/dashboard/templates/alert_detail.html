@@ -16,6 +16,7 @@
 </table>
 
 <form method="post" action="{{ url_for('dashboard.update_alert_status', alert_id=alert.id) }}" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="status">Status:</label>
     <select name="status" id="status">
         {% for value, label in [("new", "New"), ("in_progress", "In Progress"), ("closed_tp", "Closed - True Positive"), ("closed_fp", "Closed - False Positive")] %}
@@ -26,6 +27,7 @@
 </form>
 
 <form method="post" action="{{ url_for('dashboard.update_alert_notes', alert_id=alert.id) }}" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="notes" class="form-label">Analyst Notes</label>
     <textarea name="notes" id="notes" class="form-control mb-2" rows="4" maxlength="2000">{{ alert.notes or "" }}</textarea>
     <div class="d-flex align-items-center gap-3">

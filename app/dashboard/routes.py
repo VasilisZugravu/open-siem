@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app
-from flask_login import login_required, login_user, logout_user
+from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import to_athens_time
 from app.db import db
@@ -16,6 +17,16 @@ dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
 # username always pays that cost, letting an attacker enumerate usernames
 # by response time.
 _DUMMY_PASSWORD_HASH = generate_password_hash("")
+
+
+def _is_safe_redirect_target(target):
+    """Only allow same-app relative paths for post-login redirects — an absolute
+    URL or a scheme-relative one ("//evil.example") would send a freshly
+    authenticated session off-site (open redirect / phishing)."""
+    if not target:
+        return False
+    parts = urlsplit(target)
+    return not parts.scheme and not parts.netloc and target.startswith("/") and not target.startswith("//")
 
 
 @dashboard_bp.route("/")
@@ -188,7 +199,9 @@ def login():
             check_password_hash(_DUMMY_PASSWORD_HASH, password)  # equalize timing
         elif user.check_password(password):
             login_user(user)
-            next_page = request.args.get("next") or url_for("dashboard.alert_feed")
+            next_page = request.args.get("next")
+            if not _is_safe_redirect_target(next_page):
+                next_page = url_for("dashboard.alert_feed")
             return redirect(next_page)
         flash("Invalid username or password.")
     return render_template("login.html")
@@ -205,7 +218,12 @@ def logout():
 @dashboard_bp.route("/api/alerts")
 def api_alerts():
     expected_key = current_app.config.get("INGEST_API_KEY")
-    if expected_key and request.headers.get("X-Api-Key") != expected_key:
+    if expected_key:
+        if request.headers.get("X-Api-Key") != expected_key:
+            return jsonify({"error": "unauthorized"}), 401
+    elif not current_user.is_authenticated:
+        # No API key configured: fail closed rather than serving alert data
+        # to anyone, instead of falling back to "open to the world".
         return jsonify({"error": "unauthorized"}), 401
 
     rule_id = request.args.get("rule_id")

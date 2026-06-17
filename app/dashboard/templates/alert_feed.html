@@ -29,10 +29,12 @@
             <div>
                 {% if feed_status[name] %}
                 <form method="post" action="{{ url_for('dashboard.stop_feed', name=name) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm">Stop</button>
                 </form>
                 {% else %}
                 <form method="post" action="{{ url_for('dashboard.start_feed', name=name) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-success btn-sm">Start</button>
                 </form>
                 {% endif %}

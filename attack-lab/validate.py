@@ -50,6 +50,22 @@ def _poll_alert(siem_url, rule_id, since_iso, api_key=None, timeout=TIMEOUT):
         time.sleep(POLL_INTERVAL)
 
 
+def _read_previous_results(path):
+    """Parse an existing COVERAGE.md's table into {scenario_num: result_str}, so a
+    single-scenario run can preserve the other rows instead of wiping them back
+    to the placeholder."""
+    previous = {}
+    if not os.path.exists(path):
+        return previous
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) != 6 or not cells[0].isdigit():
+                continue
+            previous[cells[0]] = cells[5]
+    return previous
+
+
 def _write_coverage_md(results, path):
     """Write COVERAGE.md. results: list of (scenario_dict, result_str) for all 8 scenarios."""
     ts = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
@@ -103,11 +119,12 @@ def main():
             print(f"Unknown scenario: {args.scenario}", file=sys.stderr)
             sys.exit(1)
 
-    results = {s["num"]: (s, "⏳") for s in SCENARIOS}
+    coverage_path = "attack-lab/COVERAGE.md"
+    previous = _read_previous_results(coverage_path)
+    results = {s["num"]: (s, previous.get(s["num"], "⏳")) for s in SCENARIOS}
     for s in to_run:
         results[s["num"]] = (s, _run_scenario(args.siem, s, api_key=args.api_key))
 
-    coverage_path = "attack-lab/COVERAGE.md"
     _write_coverage_md([results[n] for n in sorted(results)], coverage_path)
     print(f"\nCoverage table written to {coverage_path}")
 

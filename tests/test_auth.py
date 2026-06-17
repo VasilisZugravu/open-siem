@@ -138,6 +138,86 @@ def test_api_alerts_with_correct_key_returns_200(authed_client):
 
 
 def test_api_alerts_no_key_configured_allows_through(client):
-    """When INGEST_API_KEY is not set, /api/alerts is open (existing behaviour)."""
+    """When INGEST_API_KEY is not set, a logged-in dashboard session can still
+    reach /api/alerts (existing behaviour)."""
     response = client.get("/api/alerts")
     assert response.status_code == 200
+
+
+def test_api_alerts_no_key_configured_blocks_anonymous_access(anon_client):
+    """Without an API key configured, /api/alerts must fail closed for anyone
+    without a logged-in session — not fall open to the entire internet."""
+    response = anon_client.get("/api/alerts")
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "unauthorized"
+
+
+# ── Login redirect (`next` param) is restricted to local paths ─────────────
+
+def test_login_redirects_to_safe_relative_next_path(anon_client):
+    response = anon_client.post(
+        "/login?next=/heatmap",
+        data={"username": "admin", "password": "secret"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/heatmap"
+
+
+def test_login_rejects_offsite_next_param(anon_client):
+    response = anon_client.post(
+        "/login?next=https://evil.example/phish",
+        data={"username": "admin", "password": "secret"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+
+
+def test_login_rejects_scheme_relative_next_param(anon_client):
+    """'//evil.example' has no scheme but a netloc — browsers treat it as an
+    absolute, off-site URL."""
+    response = anon_client.post(
+        "/login?next=//evil.example",
+        data={"username": "admin", "password": "secret"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+
+
+# ── CSRF protection on dashboard POST routes ────────────────────────────────
+
+@pytest.fixture
+def csrf_app():
+    """App with CSRF protection explicitly enabled (it's off under TESTING by
+    default so the rest of the suite doesn't need to thread a token through
+    every form post)."""
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "TESTING": True,
+        "WTF_CSRF_ENABLED": True,
+    })
+    with app.app_context():
+        ensure_admin("admin", "secret")
+        yield app
+
+
+def test_post_without_csrf_token_is_rejected(csrf_app):
+    client = csrf_app.test_client()
+    response = client.post("/login", data={"username": "admin", "password": "secret"})
+    assert response.status_code == 400
+
+
+def test_post_with_valid_csrf_token_succeeds(csrf_app):
+    client = csrf_app.test_client()
+    client.get("/login")  # populates the session's csrf token
+    with client.session_transaction() as sess:
+        token = sess["_csrf_token"]
+
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "secret", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302

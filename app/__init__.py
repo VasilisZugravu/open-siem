@@ -37,11 +37,13 @@ def create_app(config=None):
     from app.dashboard.routes import dashboard_bp
     from app.auth import init_auth
     from app.cli import register_cli
+    from app.csrf import init_csrf
 
     app.register_blueprint(ingest_bp)
     app.register_blueprint(dashboard_bp)
     init_auth(app)
     register_cli(app)
+    init_csrf(app)
 
     with app.app_context():
         db.create_all()

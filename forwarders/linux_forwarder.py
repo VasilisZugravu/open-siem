@@ -4,7 +4,7 @@ import os
 import re
 import socket
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -35,9 +35,18 @@ SYSLOG_TIMESTAMP_RE = re.compile(r"^(\w{3}\s+\d{1,2} \d{2}:\d{2}:\d{2})")
 def _parse_timestamp(line):
     match = SYSLOG_TIMESTAMP_RE.match(line)
     if not match:
-        return datetime.utcnow().isoformat()
-    parsed = datetime.strptime(match.group(1), "%b %d %H:%M:%S")
-    return parsed.replace(year=datetime.utcnow().year).isoformat()
+        return datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    parsed = datetime.strptime(match.group(1), "%b %d %H:%M:%S").replace(
+        year=now.year, tzinfo=timezone.utc
+    )
+    # Syslog timestamps have no year. Stamping the current year is wrong for a
+    # "Dec 31" line read on "Jan 1/2" of the next year — it lands ~12 months in
+    # the future and never falls inside any "recent" detection window. If the
+    # naive guess is more than a day ahead of now, it must be from last year.
+    if parsed - now > timedelta(days=1):
+        parsed = parsed.replace(year=now.year - 1)
+    return parsed.isoformat()
 
 
 def parse_auth_log_line(line):

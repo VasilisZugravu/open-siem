@@ -1,6 +1,6 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
-from forwarders.linux_forwarder import parse_auth_log_line
+from forwarders.linux_forwarder import _parse_timestamp, parse_auth_log_line
 from forwarders.windows_forwarder import map_sysmon_event
 
 
@@ -51,6 +51,28 @@ def test_parse_sudo_useradd():
 def test_parse_unrelated_line_returns_none():
     line = "Jun 16 10:24:30 linux-vm CRON[5678]: pam_unix(cron:session): session opened for user root"
     assert parse_auth_log_line(line) is None
+
+
+def test_parse_timestamp_year_rollover_dec_line_read_in_january(monkeypatch):
+    """A 'Dec 31' line tailed on Jan 2 actually happened last year — stamping
+    the current year would put it ~12 months in the future and it would never
+    fall inside any 'recent' detection window."""
+    import forwarders.linux_forwarder as linux_forwarder
+
+    fixed_now = datetime(2026, 1, 2, 9, 0, 0, tzinfo=timezone.utc)
+
+    class _FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    monkeypatch.setattr(linux_forwarder, "datetime", _FixedDatetime)
+
+    result = _parse_timestamp("Dec 31 23:59:00 linux-vm sshd[1]: some line")
+    parsed = datetime.fromisoformat(result)
+
+    assert parsed.year == 2025
+    assert parsed <= fixed_now
 
 
 SYSMON_NS = "http://schemas.microsoft.com/win/2004/08/events/event"
@@ -201,6 +223,34 @@ def test_map_network_connection_c2_port():
 
 def test_map_unhandled_event_id_returns_none():
     assert map_sysmon_event(SYSMON_PROCESS_TERMINATE) is None
+
+
+SYSMON_NETWORK_CONNECTION_NO_PORT = f"""<Event xmlns="{SYSMON_NS}">
+  <System>
+    <Provider Name="Microsoft-Windows-Sysmon" Guid="{{5770385f-c22a-43e0-bf4c-06f5698ffbd9}}"/>
+    <EventID>3</EventID>
+    <TimeCreated SystemTime="2026-06-16T10:28:00.0000000Z"/>
+    <EventRecordID>106</EventRecordID>
+    <Computer>WIN-VM</Computer>
+  </System>
+  <EventData>
+    <Data Name="UtcTime">2026-06-16 10:28:00.000</Data>
+    <Data Name="Image">C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</Data>
+    <Data Name="User">WIN-VM\\bob</Data>
+    <Data Name="Protocol">tcp</Data>
+    <Data Name="SourceIp">10.0.0.5</Data>
+    <Data Name="DestinationIp">198.51.100.23</Data>
+  </EventData>
+</Event>"""
+
+
+def test_map_network_connection_without_destination_port_does_not_crash():
+    """Some Sysmon network_connection records (notably some IPv6 records) omit
+    DestinationPort entirely — int(None) must not blow up the whole poll loop."""
+    event = map_sysmon_event(SYSMON_NETWORK_CONNECTION_NO_PORT)
+    assert event["event_type"] == "network_connection"
+    assert event["dest_ip"] == "198.51.100.23"
+    assert "dest_port" not in event["details"]
 
 
 def test_replay_dispatch_auth_line_uses_auth_parser():

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, current_app, request, jsonify
 from app.db import db
 from app.models import Event
@@ -28,6 +28,14 @@ def ingest_event():
     except (ValueError, TypeError):
         return jsonify({"error": "invalid timestamp"}), 400
 
+    # Normalize to naive UTC at the boundary: forwarders may send timezone-aware
+    # timestamps (e.g. "...+00:00"), but Event.timestamp is a naive column and
+    # every comparison in the detection engine assumes naive UTC (datetime.utcnow()).
+    # Storing an aware value here would silently break aggregation/sequence
+    # time-window filtering.
+    if timestamp.tzinfo is not None:
+        timestamp = timestamp.astimezone(timezone.utc).replace(tzinfo=None)
+
     src_ip = data.get("src_ip")
     event = Event(
         timestamp=timestamp,
@@ -43,6 +51,13 @@ def ingest_event():
         enrichment=enrich_ip(src_ip),
     )
     db.session.add(event)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        # Without this, a transient failure (e.g. "database is locked") leaves
+        # the scoped session in a broken state, and every subsequent /ingest
+        # on this worker fails with PendingRollbackError until it's reset.
+        db.session.rollback()
+        raise
 
     return jsonify({"id": event.id}), 201

@@ -56,6 +56,13 @@ def map_sysmon_event(xml_string):
         }
 
     if event_id == 3:
+        details = {}
+        dest_port = event_data.get("DestinationPort")
+        if dest_port is not None:
+            try:
+                details["dest_port"] = int(dest_port)
+            except ValueError:
+                pass
         return {
             "timestamp": timestamp,
             "host": HOST_LABEL,
@@ -63,7 +70,7 @@ def map_sysmon_event(xml_string):
             "process_name": _basename(event_data.get("Image")),
             "user": event_data.get("User"),
             "dest_ip": event_data.get("DestinationIp"),
-            "details": {"dest_port": int(event_data.get("DestinationPort"))},
+            "details": details,
             "raw": xml_string,
         }
 

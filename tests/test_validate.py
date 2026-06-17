@@ -12,6 +12,7 @@ _validate = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_validate)
 
 _write_coverage_md = _validate._write_coverage_md
+_read_previous_results = _validate._read_previous_results
 _poll_alert = _validate._poll_alert
 SCENARIOS = _validate.SCENARIOS
 
@@ -39,6 +40,30 @@ def test_write_coverage_md_pending(tmp_path):
     assert "⏳" in content
     assert "✅" not in content
     assert "❌" not in content
+
+
+def test_read_previous_results_missing_file_returns_empty(tmp_path):
+    assert _read_previous_results(str(tmp_path / "missing.md")) == {}
+
+
+def test_single_scenario_run_preserves_other_rows(tmp_path):
+    """Running --scenario for one scenario must not wipe the other 11 rows'
+    previously recorded results back to the pending placeholder."""
+    out = str(tmp_path / "COVERAGE.md")
+    all_passing = [(s, "✅") for s in SCENARIOS]
+    _write_coverage_md(all_passing, out)
+
+    previous = _read_previous_results(out)
+    results = {s["num"]: (s, previous.get(s["num"], "⏳")) for s in SCENARIOS}
+    results["01"] = (SCENARIOS[0], "❌")
+    _write_coverage_md([results[n] for n in sorted(results)], out)
+
+    content = Path(out).read_text(encoding="utf-8")
+    row_01 = next(l for l in content.splitlines() if l.startswith("| 01 |"))
+    assert "❌" in row_01
+    # every other scenario's prior ✅ must survive, not reset to the pending placeholder
+    assert content.count("✅") == 11
+    assert "⏳" not in content
 
 
 def test_poll_alert_found():

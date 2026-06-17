@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from app import create_app
 from app.models import Event
@@ -48,6 +50,23 @@ def test_ingest_invalid_json(client):
     assert response.status_code == 400
 
 
+def test_ingest_normalizes_timezone_aware_timestamp_to_naive_utc(client):
+    """A forwarder may send a tz-aware ISO timestamp (e.g. host_forwarder.py's
+    datetime.now(timezone.utc).isoformat()). Event.timestamp is a naive column
+    compared against naive datetime.utcnow() throughout the detection engine —
+    storing the aware value as-is would silently break those comparisons."""
+    response = client.post("/ingest", json={
+        "timestamp": "2026-06-15T13:00:00+03:00",
+        "host": "linux-vm",
+        "event_type": "auth_failure",
+    })
+
+    assert response.status_code == 201
+    event = Event.query.first()
+    assert event.timestamp.tzinfo is None
+    assert event.timestamp == datetime(2026, 6, 15, 10, 0, 0)
+
+
 def test_ingest_invalid_timestamp(client):
     response = client.post("/ingest", json={
         "timestamp": "not-a-date",
@@ -57,6 +76,42 @@ def test_ingest_invalid_timestamp(client):
 
     assert response.status_code == 400
     assert "timestamp" in response.get_json()["error"]
+
+
+def test_ingest_rolls_back_session_on_commit_failure(client, monkeypatch):
+    """A failed commit (e.g. a transient DB lock) must not leave the scoped
+    session broken for the next request on this worker."""
+    from app.db import db
+
+    real_commit = db.session.commit
+    calls = {"n": 0}
+
+    def flaky_commit():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise Exception("simulated commit failure")
+        return real_commit()
+
+    monkeypatch.setattr(db.session, "commit", flaky_commit)
+
+    # TESTING=True makes Flask propagate unhandled exceptions out of the test
+    # client instead of converting them to a 500 response — that's fine, the
+    # behavior under test is whether the session recovers afterwards.
+    with pytest.raises(Exception, match="simulated commit failure"):
+        client.post("/ingest", json={
+            "timestamp": "2026-06-15T10:00:00",
+            "host": "linux-vm",
+            "event_type": "auth_failure",
+        })
+
+    monkeypatch.setattr(db.session, "commit", real_commit)
+
+    recovered_response = client.post("/ingest", json={
+        "timestamp": "2026-06-15T10:00:01",
+        "host": "linux-vm",
+        "event_type": "auth_failure",
+    })
+    assert recovered_response.status_code == 201
 
 
 def test_ingest_rejects_missing_key(authed_client):

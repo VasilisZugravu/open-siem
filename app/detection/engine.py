@@ -184,8 +184,9 @@ def evaluate_sequence_rules(rules, now=None):
                 Event.query
                 .filter(
                     Event.event_type == step2["event_type"],
-                    Event.timestamp > e1.timestamp,
+                    Event.timestamp >= e1.timestamp,
                     Event.timestamp <= e1.timestamp + window,
+                    Event.id != e1.id,
                 )
                 .order_by(Event.timestamp)
                 .all()

@@ -59,6 +59,23 @@ def test_sequence_fires_alert_when_both_steps_on_same_host(app):
     assert alert.details["step2_event"] == e2.id
 
 
+def test_sequence_fires_when_step2_shares_step1_exact_timestamp(app):
+    """Second-granularity timestamps (common with forwarders/replayed logs) can
+    put both steps at the exact same instant — the strict '>' ordering used to
+    exclude this, dropping a real correlated pair."""
+    e1 = _event("host-a", "step_one", _BASE)
+    e2 = _event("host-a", "step_two", _BASE)
+    now = _BASE + timedelta(seconds=60)
+
+    evaluate_sequence_rules([_RULE], now=now)
+
+    db.session.expire_all()
+    alerts = Alert.query.all()
+    assert len(alerts) == 1
+    assert e1.id in alerts[0].triggering_event_ids
+    assert e2.id in alerts[0].triggering_event_ids
+
+
 def test_sequence_no_alert_when_step2_before_step1(app):
     # step_two arrives BEFORE step_one — ordering must be enforced
     _event("host-a", "step_two", _BASE)
