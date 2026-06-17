@@ -21,6 +21,9 @@ SCENARIOS = [
     {"num": "07", "name": "LSASS Memory Dump",  "folder": "07-procdump-lsass",     "ext": "ps1", "vm": "Windows", "rule": "RULE-007", "technique": "T1003.001"},
     {"num": "08", "name": "C2 Port Connection", "folder": "08-c2-port",            "ext": "ps1", "vm": "Windows", "rule": "RULE-008", "technique": "T1071"},
     {"num": "09", "name": "Brute Then Persist", "folder": "09-brute-then-persist", "ext": "sh",  "vm": "Linux",   "rule": "RULE-009", "technique": "T1136.001"},
+    {"num": "10", "name": "LSASS Dump via comsvcs.dll", "folder": "10-lsass-comsvcs-dump", "ext": "ps1", "vm": "Windows", "rule": "RULE-010", "technique": "T1003.001"},
+    {"num": "11", "name": "Encoded PowerShell Evasion", "folder": "11-encoded-powershell-evasion", "ext": "ps1", "vm": "Windows", "rule": "RULE-011", "technique": "T1059.001"},
+    {"num": "12", "name": "certutil Decode",    "folder": "12-certutil-decode",     "ext": "ps1", "vm": "Windows", "rule": "RULE-012", "technique": "T1140"},
 ]
 
 POLL_INTERVAL = 5

@@ -73,6 +73,39 @@ _RULE_009 = {
         "timeframe_seconds": 600,
     },
 }
+_RULE_010 = {
+    "id": "RULE-010", "title": "LSASS Dump via comsvcs.dll", "severity": "high",
+    "attack_technique": "T1003.001", "attack_tactic": "Credential Access",
+    "detection": {
+        "event_type": "process_creation",
+        "conditions": {
+            "process_name": "rundll32.exe",
+            "command_line": {"regex": "(?i)comsvcs\\.dll.*minidump"},
+        },
+    },
+}
+_RULE_011 = {
+    "id": "RULE-011", "title": "Encoded PowerShell (Case/Long-Form Evasion)", "severity": "high",
+    "attack_technique": "T1059.001", "attack_tactic": "Execution",
+    "detection": {
+        "event_type": "process_creation",
+        "conditions": {
+            "process_name": {"regex": "(?i)^powershell\\.exe$"},
+            "command_line": {"regex": "(?i)-enc"},
+        },
+    },
+}
+_RULE_012 = {
+    "id": "RULE-012", "title": "certutil Used to Decode a File", "severity": "medium",
+    "attack_technique": "T1140", "attack_tactic": "Defense Evasion",
+    "detection": {
+        "event_type": "process_creation",
+        "conditions": {
+            "process_name": "certutil.exe",
+            "command_line": {"regex": "(?i)-decode"},
+        },
+    },
+}
 
 # Fixed base time used by sequence tests
 _BASE = datetime(2026, 1, 1, 12, 0, 0)
@@ -227,3 +260,123 @@ def test_fp_rule009_different_hosts(app):
     evaluate_sequence_rules([_RULE_009], now=_BASE + timedelta(seconds=60))
 
     assert Alert.query.count() == 0
+
+
+def test_fp_rule010_comsvcs_without_minidump(app):
+    """rundll32.exe loads comsvcs.dll for an unrelated export (no 'minidump'), no alert."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="rundll32.exe",
+        command_line="rundll32.exe comsvcs.dll, ResolveTrustee",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_010])
+
+    assert Alert.query.count() == 0
+
+
+def test_fp_rule011_normal_case_no_enc_flag(app):
+    """powershell.exe running a plain script with no -enc flag in any case, no alert."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="powershell.exe",
+        command_line="powershell.exe -File deploy.ps1",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_011])
+
+    assert Alert.query.count() == 0
+
+
+def test_fp_rule012_certutil_hashfile(app):
+    """certutil.exe -hashfile is routine certificate tooling, not -decode, no alert."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="certutil.exe",
+        command_line="certutil.exe -hashfile report.pdf SHA256",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_012])
+
+    assert Alert.query.count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Detection-in-depth: alternate-technique-path / evasion coverage
+#
+# Each pair below replays the same adversary goal two ways: one that the
+# original rule was written to catch, and one crafted to slip past it. The
+# new rule (010/011) closes exactly that gap.
+# ---------------------------------------------------------------------------
+
+def test_evasion_lsass_comsvcs_bypasses_rule007(app):
+    """comsvcs.dll MiniDump targets a PID, not the string 'lsass' — RULE-007 misses it."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="rundll32.exe",
+        command_line="rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 668 out.dmp full",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_007])
+
+    assert Alert.query.count() == 0
+
+
+def test_evasion_lsass_comsvcs_caught_by_rule010(app):
+    """The same comsvcs.dll MiniDump command line that bypasses RULE-007 fires RULE-010."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="rundll32.exe",
+        command_line="rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 668 out.dmp full",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_010])
+
+    assert Alert.query.count() == 1
+
+
+def test_evasion_encoded_powershell_case_bypasses_rule004(app):
+    """Randomized-case '-EnCoDedCommand' and 'PowerShell.EXE' bypass RULE-004's exact-case match."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="PowerShell.EXE",
+        command_line="PowerShell.EXE -EnCoDedCommand JABzAD0AbgBlAHcA...",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_004])
+
+    assert Alert.query.count() == 0
+
+
+def test_evasion_encoded_powershell_case_caught_by_rule011(app):
+    """The same case-randomized command line that bypasses RULE-004 fires RULE-011."""
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="PowerShell.EXE",
+        command_line="PowerShell.EXE -EnCoDedCommand JABzAD0AbgBlAHcA...",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([_RULE_011])
+
+    assert Alert.query.count() == 1

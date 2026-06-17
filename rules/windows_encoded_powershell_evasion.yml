@@ -1,0 +1,17 @@
+id: RULE-011
+title: Encoded PowerShell Command (Case/Long-Form Evasion)
+description: >
+  Case-insensitive, long-form counterpart to RULE-004. Catches -EncodedCommand /
+  randomized-case "-EnC" flags and a randomized-case "powershell.exe" process name,
+  both of which silently bypass RULE-004's exact-case substring match.
+severity: high
+attack_technique: T1059.001
+attack_tactic: Execution
+detection:
+  event_type: process_creation
+  conditions:
+    process_name:
+      regex: "(?i)^powershell\\.exe$"
+    command_line:
+      regex: "(?i)-enc"
+tags: [windows, execution, evasion]

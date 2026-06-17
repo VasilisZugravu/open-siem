@@ -1,0 +1,16 @@
+id: RULE-010
+title: LSASS Dump via comsvcs.dll (rundll32)
+description: >
+  rundll32.exe invoked comsvcs.dll's MiniDump export, the built-in LOLBin method for
+  dumping LSASS memory without dropping procdump or any other dump tool to disk. The
+  command line targets a process ID, not the string "lsass", so RULE-007 does not catch it.
+severity: high
+attack_technique: T1003.001
+attack_tactic: Credential Access
+detection:
+  event_type: process_creation
+  conditions:
+    process_name: rundll32.exe
+    command_line:
+      regex: "(?i)comsvcs\\.dll.*minidump"
+tags: [windows, credential-access, lolbin]

@@ -4,7 +4,7 @@ from scripts.seed_demo_data import build_demo_events
 def test_build_demo_events_covers_all_scenarios():
     events = build_demo_events()
 
-    assert len(events) == 15
+    assert len(events) == 18
 
     event_types = {e["event_type"] for e in events}
     assert event_types == {
@@ -16,11 +16,14 @@ def test_build_demo_events_covers_all_scenarios():
     assert all(e["src_ip"] == "45.155.205.233" for e in ssh_events)
 
     command_lines = " ".join(e.get("command_line", "") for e in events)
-    assert "visudo" in command_lines        # RULE-002
-    assert "useradd" in command_lines       # RULE-003
-    assert "-enc" in command_lines          # RULE-004
-    assert "/create" in command_lines       # RULE-006
-    assert "lsass" in command_lines         # RULE-007
+    assert "visudo" in command_lines          # RULE-002
+    assert "useradd" in command_lines         # RULE-003
+    assert "-enc" in command_lines            # RULE-004
+    assert "/create" in command_lines         # RULE-006
+    assert "lsass" in command_lines           # RULE-007
+    assert "comsvcs.dll" in command_lines     # RULE-010
+    assert "EnCoDedCommand" in command_lines  # RULE-011
+    assert "-decode" in command_lines         # RULE-012
 
     parent_processes = [e.get("details", {}).get("parent_process") for e in events]
     assert "winword.exe" in parent_processes  # RULE-005

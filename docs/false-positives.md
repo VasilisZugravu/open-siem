@@ -192,6 +192,74 @@ provisioning looks identical to a post-compromise persistence action.
 
 ---
 
+## RULE-010 — LSASS Dump via comsvcs.dll (T1003.001)
+
+**Detection:** `process_creation` for `rundll32.exe` whose `command_line` matches
+`comsvcs\.dll.*minidump` (case-insensitive).
+
+**Why this rule exists:** RULE-007 matches the literal substring "lsass", but the
+built-in `rundll32.exe comsvcs.dll, MiniDump <pid> out.dmp full` LOLBin technique
+targets a process ID, never the string "lsass" — it walks straight past RULE-007.
+See `tests/test_false_positives.py::test_evasion_lsass_comsvcs_bypasses_rule007` for
+the bypass and `test_evasion_lsass_comsvcs_caught_by_rule010` for the catch.
+
+**Realistic FP scenario:** Legitimate software occasionally loads `comsvcs.dll` for
+unrelated COM-surrogate exports (e.g. `ResolveTrustee`). The `minidump` anchor in the
+regex keeps this rule narrow — only the dump export fires.
+
+**Recommended tuning:**
+- Add a condition on the target PID resolving to `lsass.exe` if process-tree
+  telemetry is available (not currently in this forwarder's event schema).
+- Allowlist EDR/AV processes that legitimately invoke `MiniDumpWriteDump` for
+  crash-reporting purposes.
+
+---
+
+## RULE-011 — Encoded PowerShell, Case/Long-Form Evasion (T1059.001)
+
+**Detection:** `process_creation` whose `process_name` matches `powershell\.exe`
+and `command_line` matches `-enc`, both case-insensitively.
+
+**Why this rule exists:** RULE-004 uses an exact-case `process_name` equality check
+and an exact-case `contains: "-enc"` substring. Both are trivially bypassed by
+case manipulation — `PowerShell.EXE -EnCoDedCommand ...` matches neither check.
+RULE-011 is the case-insensitive counterpart that closes that gap; see
+`test_evasion_encoded_powershell_case_bypasses_rule004` and
+`test_evasion_encoded_powershell_case_caught_by_rule011`.
+
+**Realistic FP scenario:** Same as RULE-004 — SCCM/Endpoint Manager and monitoring
+agents that pass `-EncodedCommand` payloads, regardless of casing.
+
+**Recommended tuning:**
+- Same as RULE-004: allowlist known signed parent processes, pair with process
+  reputation context.
+- Run RULE-004 and RULE-011 together rather than replacing one with the other —
+  RULE-004 stays cheap/specific for the common case, RULE-011 covers the evasion
+  case.
+
+---
+
+## RULE-012 — certutil Used to Decode a File (T1140)
+
+**Detection:** `process_creation` for `certutil.exe` whose `command_line` matches
+`-decode` (case-insensitive).
+
+**Realistic FP scenario:** `certutil -decode` has legitimate uses — decoding a
+base64-armored certificate or CRL that was emailed or copy-pasted as text. This is
+rare in most environments but not unheard of in PKI administration workflows.
+
+**Why it fires:** The rule matches any use of `-decode`, regardless of what is being
+decoded.
+
+**Recommended tuning:**
+- Pair with the file extension being written: flag only if the output path ends in
+  `.exe`, `.dll`, or `.ps1` rather than `.cer`/`.crt`.
+- Correlate with a preceding `certutil -urlcache` (download) on the same host —
+  the download-then-decode pair is far more specific to payload staging than
+  `-decode` alone.
+
+---
+
 ## Summary
 
 | Rule | FP Risk | Primary FP Cause | Priority Tuning |
@@ -205,7 +273,16 @@ provisioning looks identical to a post-compromise persistence action.
 | RULE-007 | Medium | LSASS process lookups | Require dump tool names |
 | RULE-008 | Low | Dev servers on 4444 | Require external dest IP |
 | RULE-009 | Medium | Admin login + provisioning | Filter on src_ip is_private |
+| RULE-010 | Low | Non-dump comsvcs.dll exports | Correlate target PID with lsass.exe |
+| RULE-011 | Medium | SCCM/agent deployments (any case) | Allowlist signed parents |
+| RULE-012 | Low-Medium | Legitimate cert/CRL decode | Gate on output file extension |
 
 The true-negative tests in `tests/test_false_positives.py` validate the most common
 benign cases. The residual FPs above require VM-level telemetry (process trees, user
 context, IP reputation) to suppress, which is documented here as a tuning roadmap.
+
+RULE-010 and RULE-011 are not new techniques — they are alternate-path coverage for
+RULE-007 and RULE-004 respectively, added because the original substring/exact-case
+matches have demonstrable evasion gaps (see the `test_evasion_*` tests in
+`tests/test_false_positives.py`). Detection-in-depth here means running the original
+and the hardened variant together, not replacing one with the other.

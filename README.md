@@ -10,7 +10,7 @@ dashboard with an ATT&CK coverage heatmap.
 - **Mock IP enrichment**: deterministic geo/ASN annotation on `src_ip` at ingest — country and AS number shown in Event Explorer and alert detail
 - **Analyst triage**: per-alert status workflow (New → In Progress → Closed TP/FP) with timestamped analyst notes
 - **Alert deduplication**: status-gate prevents re-firing while an open alert for the same rule+host exists; aggregation and sequence rules use cooldown windows
-- **122 automated tests** covering unit, integration, end-to-end detection chains, and false-positive (true-negative) validation
+- **129 automated tests** covering unit, integration, end-to-end detection chains, and false-positive (true-negative) validation
 
 ## Architecture
 
@@ -147,6 +147,12 @@ This polls `/api/alerts` for each rule and writes results to
 | 7 | procdump targeting lsass.exe | RULE-007 | T1003.001 | Credential Access | Single event |
 | 8 | Outbound connection to known C2 port (4444/4445) | RULE-008 | T1071 | Command and Control | Single event |
 | 9 | SSH auth success → useradd on same host within 10 min | RULE-009 | T1136.001 | Persistence | Sequence (correlation) |
+| 10 | LSASS dump via comsvcs.dll (rundll32 LOLBin, no procdump needed) | RULE-010 | T1003.001 | Credential Access | Single event |
+| 11 | Encoded PowerShell, case/long-form evasion of RULE-004 | RULE-011 | T1059.001 | Execution | Single event |
+| 12 | certutil -decode used to stage a decoded payload | RULE-012 | T1140 | Defense Evasion | Single event |
+
+RULE-010 and RULE-011 are deliberate alternate-path coverage, not duplicate rules —
+see [docs/false-positives.md](docs/false-positives.md) for the evasion each one closes.
 
 ## Testing
 

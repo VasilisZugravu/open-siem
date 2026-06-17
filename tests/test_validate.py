@@ -24,7 +24,11 @@ def test_write_coverage_md_all_passing(tmp_path):
     assert "✅" in content
     assert "RULE-001" in content
     assert "RULE-008" in content
-    assert content.count("| 0") == 9  # 9 scenario rows
+    assert len(SCENARIOS) == 12
+    assert "RULE-010" in content
+    assert "RULE-012" in content
+    data_rows = [l for l in content.splitlines() if l.startswith("| ") and "Scenario" not in l and "---" not in l]
+    assert len(data_rows) == 12
 
 
 def test_write_coverage_md_pending(tmp_path):

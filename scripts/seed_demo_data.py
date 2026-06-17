@@ -4,7 +4,7 @@ BASE_URL = "http://localhost:5000"
 
 
 def build_demo_events():
-    """Build 15 synthetic events covering all 9 detection rules."""
+    """Build 18 synthetic events covering all 12 detection rules."""
     now = datetime.utcnow()
     events = []
 
@@ -120,6 +120,42 @@ def build_demo_events():
         "command_line": "useradd -m backdoor2",
         "details": {},
         "raw": "attacker : TTY=pts/1 ; PWD=/home/attacker ; USER=root ; COMMAND=/usr/sbin/useradd -m backdoor2",
+    })
+
+    # Scenario 10 (RULE-010, T1003.001): LSASS dump via comsvcs.dll (rundll32 LOLBin)
+    events.append({
+        "timestamp": now.isoformat(),
+        "host": "win-vm",
+        "event_type": "process_creation",
+        "user": "win-vm\\bob",
+        "process_name": "rundll32.exe",
+        "command_line": "rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 668 out.dmp full",
+        "details": {"parent_process": "cmd.exe"},
+        "raw": "Sysmon Event ID 1: Process Create",
+    })
+
+    # Scenario 11 (RULE-011, T1059.001): encoded PowerShell, case/long-form evasion of RULE-004
+    events.append({
+        "timestamp": now.isoformat(),
+        "host": "win-vm",
+        "event_type": "process_creation",
+        "user": "win-vm\\bob",
+        "process_name": "PowerShell.EXE",
+        "command_line": "PowerShell.EXE -EnCoDedCommand SGVsbG8gV29ybGQ=",
+        "details": {"parent_process": "explorer.exe"},
+        "raw": "Sysmon Event ID 1: Process Create",
+    })
+
+    # Scenario 12 (RULE-012, T1140): certutil used to decode a staged payload
+    events.append({
+        "timestamp": now.isoformat(),
+        "host": "win-vm",
+        "event_type": "process_creation",
+        "user": "win-vm\\bob",
+        "process_name": "certutil.exe",
+        "command_line": "certutil.exe -decode payload.b64 payload.exe",
+        "details": {"parent_process": "cmd.exe"},
+        "raw": "Sysmon Event ID 1: Process Create",
     })
 
     return events

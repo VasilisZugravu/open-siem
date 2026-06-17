@@ -1,9 +1,13 @@
 # Attack Lab
 
-Nine attack simulation scenarios — one per detection rule — that generate real
+Twelve attack simulation scenarios — one per detection rule — that generate real
 telemetry on Linux and Windows VMs to prove end-to-end detection coverage.
 Each script is self-contained and self-cleaning (removes test users, dump files,
 scheduled tasks).
+
+Scenarios 10-11 are deliberate evasion pairs against scenarios 07 and 04: same
+adversary goal, an alternate command line that the original rule's substring/
+exact-case match misses, caught instead by the hardened rule (RULE-010/011).
 
 After running scenarios, `validate.py` polls the SIEM and writes results to
 [COVERAGE.md](COVERAGE.md).
@@ -23,6 +27,9 @@ After running scenarios, `validate.py` polls the SIEM and writes results to
 | 07 | LSASS Memory Dump | Windows | `07-procdump-lsass/run.ps1` | RULE-007 | T1003.001 |
 | 08 | C2 Port Connection | Windows | `08-c2-port/run.ps1` | RULE-008 | T1071 |
 | 09 | Brute Force → Account Creation | Linux | `09-brute-then-persist/run.sh` | RULE-009 | T1136.001 |
+| 10 | LSASS Dump via comsvcs.dll | Windows | `10-lsass-comsvcs-dump/run.ps1` | RULE-010 | T1003.001 |
+| 11 | Encoded PowerShell Evasion | Windows | `11-encoded-powershell-evasion/run.ps1` | RULE-011 | T1059.001 |
+| 12 | certutil Decode | Windows | `12-certutil-decode/run.ps1` | RULE-012 | T1140 |
 
 ---
 
@@ -82,6 +89,9 @@ POSTs them to `/ingest` (process creations and network connections).
 - `procdump.exe` (free, [Sysinternals](https://learn.microsoft.com/en-us/sysinternals/downloads/procdump)) placed in the `07-procdump-lsass/` folder
 - The script must be run as Administrator
 
+**Scenario 10 (LSASS dump via comsvcs.dll) additionally requires:**
+- The script must be run as Administrator (reading LSASS memory requires elevation)
+
 ---
 
 ## Running a scenario
@@ -112,7 +122,7 @@ dashboard at `http://<siem-ip>:5000` within one cycle.
 `validate.py` is a stdlib-only helper — no `pip install` needed:
 
 ```bash
-# Run all 9 scenarios interactively
+# Run all 12 scenarios interactively
 python attack-lab/validate.py --siem http://<siem-ip>:5000
 
 # Run one scenario

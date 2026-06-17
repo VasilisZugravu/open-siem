@@ -1,0 +1,16 @@
+id: RULE-012
+title: certutil Used to Decode a File
+description: >
+  certutil.exe -decode is a common LOLBin technique for converting a base64-encoded
+  payload (often staged via -urlcache) back into an executable on disk, avoiding the
+  need to transfer tools that would be flagged by network or file-reputation controls.
+severity: medium
+attack_technique: T1140
+attack_tactic: Defense Evasion
+detection:
+  event_type: process_creation
+  conditions:
+    process_name: certutil.exe
+    command_line:
+      regex: "(?i)-decode"
+tags: [windows, defense-evasion, lolbin]
