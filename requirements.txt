@@ -1,6 +1,8 @@
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
+# psycopg2-binary is the pre-compiled variant — fine for dev/Docker but in
+# production you may prefer psycopg2 (source build) for better glibc compatibility.
 psycopg2-binary==2.9.9
 PyYAML==6.0.1
 pydantic==2.13.4
