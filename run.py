@@ -1,5 +1,13 @@
 import os
 
+# Dev defaults — set before create_app() reads the environment.
+# This block only runs when executed directly (`python run.py`); gunicorn
+# imports this module as 'run' so __name__ != '__main__' and the block is
+# skipped, leaving the production RuntimeError guards intact.
+if __name__ == "__main__":
+    os.environ.setdefault("SECRET_KEY", "dev-secret-not-for-production")
+    os.environ.setdefault("INGEST_API_KEY", "dev-api-key")
+
 from app import create_app
 from app.cli import ensure_admin
 
