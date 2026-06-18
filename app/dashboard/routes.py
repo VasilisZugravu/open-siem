@@ -312,6 +312,8 @@ def event_explorer():
 
 @dashboard_bp.route("/login", methods=["GET", "POST"])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard.alert_feed"))
     if request.method == "POST":
         if is_rate_limited("login_attempts", request.remote_addr, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_WINDOW_SECONDS):
             flash("Too many failed login attempts. Try again later.")

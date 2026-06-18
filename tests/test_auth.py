@@ -55,6 +55,14 @@ def test_login_correct_credentials_redirects_to_feed(authed_client):
     assert response.headers["Location"] == "/"
 
 
+def test_authenticated_get_login_redirects_to_feed(authed_client):
+    """ISSUE-002: visiting /login while already authenticated should redirect."""
+    authed_client.post("/login", data={"username": "admin", "password": "secret"})
+    response = authed_client.get("/login", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+
+
 def test_login_wrong_credentials_rerenders_form(authed_client):
     response = authed_client.post(
         "/login",
