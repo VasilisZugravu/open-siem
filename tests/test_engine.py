@@ -311,6 +311,86 @@ def test_aggregation_rule_skips_events_with_missing_group_by_field(app):
     assert Alert.query.count() == 0
 
 
+# ── H3: error-isolation regression tests ─────────────────────────────────────
+
+def test_bad_rule_does_not_prevent_good_rule_from_firing(app):
+    """H3: A rule with an unknown operator must not abort the whole detection
+    cycle — the valid rule that follows it must still produce an alert."""
+    bad_rule = {
+        "id": "RULE-BAD-OP",
+        "title": "Bad Operator Rule",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "event_type": "process_creation",
+            "conditions": {"command_line": {"unknown_op": "boom"}},
+        },
+    }
+    good_rule = {
+        "id": "RULE-GOOD-OP",
+        "title": "Good Rule",
+        "severity": "high",
+        "attack_technique": "T9999",
+        "attack_tactic": "Testing",
+        "detection": {
+            "event_type": "process_creation",
+            "conditions": {"process_name": "powershell.exe"},
+        },
+    }
+    db.session.add(Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="powershell.exe",
+        command_line="powershell.exe -nop",
+    ))
+    db.session.commit()
+
+    evaluate_single_event_rules([bad_rule, good_rule])
+
+    assert Alert.query.count() == 1
+    assert Alert.query.first().rule_id == "RULE-GOOD-OP"
+
+
+# ── H1/L2: watermark-lookback regression test ─────────────────────────────────
+
+def test_watermark_lookback_catches_late_committing_event(app):
+    """H1/L2: An event whose ID lies below the current high-water mark (simulating
+    a late-committing concurrent writer) must still be picked up by the lookback
+    window and produce an alert."""
+    from app.models import EngineState
+    from app.detection.engine import _WATERMARK_LOOKBACK
+
+    # Insert a matching event (SQLite assigns id sequentially, e.g. 1)
+    event = Event(
+        timestamp=datetime.utcnow(),
+        host="win-vm",
+        event_type="process_creation",
+        process_name="powershell.exe",
+        command_line="powershell.exe -enc abc",
+    )
+    db.session.add(event)
+    db.session.commit()
+
+    # Simulate: a concurrent writer already advanced the watermark well past this
+    # event's id, but not so far that the lookback window can't reach it.
+    gap = _WATERMARK_LOOKBACK // 2  # e.g. 25 — within the lookback window
+    advanced = event.id + gap
+    state = db.session.get(EngineState, 1)
+    if state is None:
+        state = EngineState(id=1, last_processed_event_id=advanced)
+        db.session.add(state)
+    else:
+        state.last_processed_event_id = advanced
+    db.session.commit()
+
+    evaluate_single_event_rules([ENCODED_POWERSHELL_RULE])
+
+    # Lookback must have re-examined the event and fired an alert
+    assert Alert.query.count() == 1
+
+
 def test_single_event_rule_fires_again_after_alert_closed(app):
     """Status-gate allows re-firing once the existing alert is closed."""
     from datetime import datetime

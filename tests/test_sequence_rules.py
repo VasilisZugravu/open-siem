@@ -159,12 +159,36 @@ def test_sequence_skips_events_missing_correlate_by_field(app):
     assert Alert.query.count() == 0
 
 
+# ── M3/L4: sequence-step determinism ─────────────────────────────────────────
+
+def test_sequence_step2_selection_is_deterministic_on_equal_timestamps(app):
+    """M3/L4: When multiple step-2 candidates share an identical timestamp,
+    the one with the lowest id must always be selected (stable sort by id).
+    Without the id tiebreak in order_by(), the pick is non-deterministic across
+    DB engines."""
+    e1 = _event("host-a", "step_one", _BASE)
+
+    # Two step-2 candidates with exactly the same timestamp
+    e2_a = _event("host-a", "step_two", _BASE + timedelta(seconds=5))
+    e2_b = _event("host-a", "step_two", _BASE + timedelta(seconds=5))
+
+    now = _BASE + timedelta(seconds=60)
+    evaluate_sequence_rules([_RULE], now=now)
+
+    db.session.expire_all()
+    alerts = Alert.query.all()
+    assert len(alerts) == 1
+    # The lower-id candidate must be picked regardless of DB ordering
+    assert alerts[0].details["step2_event"] == e2_a.id
+
+
 # ── Integration test: end-to-end via run_one_cycle ───────────────────────────
 
 def test_sequence_rule_fires_via_run_one_cycle(app, monkeypatch, tmp_path):
     rule_data = {
         "id": "RULE-009",
         "title": "Brute Force Followed by Account Creation",
+        "description": "SSH success followed by useradd on the same host.",
         "severity": "critical",
         "attack_technique": "T1136.001",
         "attack_tactic": "Persistence",
@@ -176,6 +200,7 @@ def test_sequence_rule_fires_via_run_one_cycle(app, monkeypatch, tmp_path):
             "correlate_by": "host",
             "timeframe_seconds": 600,
         },
+        "tags": [],
     }
     (tmp_path / "rule009.yml").write_text(yaml.dump(rule_data))
     monkeypatch.setattr("app.scheduler.RULES_DIR", str(tmp_path))

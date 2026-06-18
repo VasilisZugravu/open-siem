@@ -38,3 +38,27 @@ def test_match_conditions_missing_field_is_no_match():
     event = {"process_name": "powershell.exe"}
     conditions = {"command_line": {"contains": "-enc"}}
     assert match_conditions(event, conditions) is False
+
+
+# ── H2: type-safety regression tests ─────────────────────────────────────────
+
+def test_contains_numeric_value_no_exception():
+    """op_contains must not raise TypeError on a numeric field value (e.g. dest_port: 4444).
+    Numeric values cannot contain a substring, so the result must be False."""
+    assert match_condition(4444, {"contains": "444"}) is False
+
+
+def test_regex_numeric_value_no_exception():
+    """op_regex must not raise TypeError on a numeric field value.
+    Numeric values cannot be regex-searched, so the result must be False."""
+    assert match_condition(4444, {"regex": r"\d+"}) is False
+
+
+def test_contains_bool_value_no_exception():
+    """op_contains must handle bool (a subtype of int) without raising TypeError."""
+    assert match_condition(True, {"contains": "True"}) is False
+
+
+def test_regex_bool_value_no_exception():
+    """op_regex must handle bool without raising TypeError."""
+    assert match_condition(False, {"regex": "False"}) is False

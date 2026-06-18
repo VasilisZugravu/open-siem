@@ -6,13 +6,16 @@ def op_equals(value, expected):
 
 
 def op_contains(value, expected):
-    if value is None:
+    if not isinstance(value, str):
+        # Non-string values (int, float, bool, None) cannot contain a substring.
+        # Attempting `expected in value` on them would raise TypeError.
         return False
     return expected in value
 
 
 def op_regex(value, pattern):
-    if value is None:
+    if not isinstance(value, str):
+        # re.search requires a string subject; return False rather than raising TypeError.
         return False
     return re.search(pattern, value) is not None
 
