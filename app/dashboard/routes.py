@@ -3,8 +3,9 @@ import threading
 import time
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app, session
 from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import to_athens_time
 from app.db import db
@@ -24,7 +25,7 @@ dashboard_bp = Blueprint(
 # missing user skips check_password's hashing entirely while a known
 # username always pays that cost, letting an attacker enumerate usernames
 # by response time.
-_DUMMY_PASSWORD_HASH = generate_password_hash("")
+_DUMMY_PASSWORD_HASH = generate_password_hash("", method="pbkdf2:sha256")
 
 # Per-source-IP login throttling: brute-forcing the single admin account has
 # no other defense (timing equalization stops enumeration, not guessing).
@@ -72,6 +73,41 @@ def _clear_login_failures(ip):
         _login_attempts_store().pop(ip, None)
 
 
+# Per-IP rate limiting for /api/alerts — same pattern as the login throttle.
+API_ALERTS_MAX_REQUESTS = 600
+API_ALERTS_WINDOW_SECONDS = 60
+_api_alerts_rate_lock = threading.Lock()
+
+
+def _api_alerts_rate_store():
+    return current_app.extensions.setdefault("api_alerts_rate", {})
+
+
+def _api_alerts_rate_limited(ip):
+    with _api_alerts_rate_lock:
+        store = _api_alerts_rate_store()
+        entry = store.get(ip)
+        if entry is None:
+            return False
+        count, window_start = entry
+        if time.monotonic() - window_start > API_ALERTS_WINDOW_SECONDS:
+            del store[ip]
+            return False
+        return count >= API_ALERTS_MAX_REQUESTS
+
+
+def _record_api_alerts_request(ip):
+    with _api_alerts_rate_lock:
+        store = _api_alerts_rate_store()
+        entry = store.get(ip)
+        now = time.monotonic()
+        if entry is None or now - entry[1] > API_ALERTS_WINDOW_SECONDS:
+            store[ip] = (1, now)
+        else:
+            count, window_start = entry
+            store[ip] = (count + 1, window_start)
+
+
 def _is_safe_redirect_target(target):
     """Only allow same-app relative paths for post-login redirects — an absolute
     URL or a scheme-relative one ("//evil.example") would send a freshly
@@ -96,11 +132,13 @@ def _alert_feed_data():
     hourly_labels = sorted(hourly_counts.keys())
     hourly_values = [hourly_counts[label] for label in hourly_labels]
 
-    severity_counts = {}
-    total_alerts = 0
-    for alert in Alert.query.all():
-        severity_counts[alert.severity] = severity_counts.get(alert.severity, 0) + 1
-        total_alerts += 1
+    severity_rows = (
+        db.session.query(Alert.severity, func.count(Alert.id))
+        .group_by(Alert.severity)
+        .all()
+    )
+    severity_counts = {row[0]: row[1] for row in severity_rows}
+    total_alerts = sum(severity_counts.values())
 
     feed_status = feed_manager.status()
 
@@ -208,6 +246,8 @@ def update_alert_status(alert_id):
     if new_status in ("new", "in_progress", "closed_tp", "closed_fp"):
         alert.status = new_status
         db.session.commit()
+    else:
+        flash(f"Invalid status value: {new_status!r}")
     return redirect(url_for("dashboard.alert_detail", alert_id=alert_id))
 
 
@@ -352,6 +392,7 @@ def login():
             check_password_hash(_DUMMY_PASSWORD_HASH, password)  # equalize timing
         elif user.check_password(password):
             _clear_login_failures(request.remote_addr)
+            session.pop("_csrf_token", None)  # L6: rotate CSRF token on login
             login_user(user)
             next_page = request.args.get("next")
             if not _is_safe_redirect_target(next_page):
@@ -365,6 +406,7 @@ def login():
 @dashboard_bp.route("/logout", methods=["POST"])
 def logout():
     logout_user()
+    session.clear()   # L6: invalidate the session including the CSRF token
     return redirect(url_for("dashboard.login"))
 
 
@@ -380,6 +422,10 @@ def api_alerts():
         # No API key configured: fail closed rather than serving alert data
         # to anyone, instead of falling back to "open to the world".
         return jsonify({"error": "unauthorized"}), 401
+
+    _record_api_alerts_request(request.remote_addr)
+    if _api_alerts_rate_limited(request.remote_addr):
+        return jsonify({"error": "rate limit exceeded"}), 429
 
     rule_id = request.args.get("rule_id")
     since = request.args.get("since")
