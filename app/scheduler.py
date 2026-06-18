@@ -15,7 +15,7 @@ def run_one_cycle(app):
         run_detection_cycle(rules)
 
 
-def start_background_loop(app, interval=30):
+def start_background_loop(app, interval=5):
     """Start a daemon thread that calls run_one_cycle every `interval` seconds."""
     def _loop():
         while True:

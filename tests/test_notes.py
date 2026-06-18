@@ -6,21 +6,21 @@ from app.models import Alert
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def unauthed_client(authed_app):
+def unauthed_client(app):
     """Unauthenticated test client for the auth-enabled app."""
-    return authed_app.test_client()
+    return app.test_client()
 
 
 @pytest.fixture
-def logged_in_client(authed_app):
+def logged_in_client(app):
     """Test client that has already POSTed to /login."""
-    client = authed_app.test_client()
+    client = app.test_client()
     client.post("/login", data={"username": "admin", "password": "secret"})
     return client
 
 
 @pytest.fixture
-def alert_id(authed_app):
+def alert_id(app):
     """Create a minimal Alert in the test DB and return its id."""
     alert = Alert(
         rule_id="RULE-001",
@@ -44,7 +44,7 @@ def test_unauthenticated_post_redirects_to_login(unauthed_client, alert_id):
     assert "/login" in response.headers["Location"]
 
 
-def test_save_note_sets_notes_and_timestamp(logged_in_client, authed_app, alert_id):
+def test_save_note_sets_notes_and_timestamp(logged_in_client, app, alert_id):
     logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "test note"})
     db.session.expire_all()
     alert = Alert.query.get(alert_id)
@@ -52,7 +52,7 @@ def test_save_note_sets_notes_and_timestamp(logged_in_client, authed_app, alert_
     assert alert.notes_updated_at is not None
 
 
-def test_overwrite_note_replaces_previous(logged_in_client, authed_app, alert_id):
+def test_overwrite_note_replaces_previous(logged_in_client, app, alert_id):
     logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "first"})
     logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "second"})
     db.session.expire_all()
@@ -60,7 +60,7 @@ def test_overwrite_note_replaces_previous(logged_in_client, authed_app, alert_id
     assert alert.notes == "second"
 
 
-def test_save_empty_note_clears_text_but_sets_timestamp(logged_in_client, authed_app, alert_id):
+def test_save_empty_note_clears_text_but_sets_timestamp(logged_in_client, app, alert_id):
     logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "something"})
     logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": ""})
     db.session.expire_all()
@@ -69,7 +69,7 @@ def test_save_empty_note_clears_text_but_sets_timestamp(logged_in_client, authed
     assert alert.notes_updated_at is not None
 
 
-def test_max_length_guard_rejects_note_over_2000_chars(logged_in_client, authed_app, alert_id):
+def test_max_length_guard_rejects_note_over_2000_chars(logged_in_client, app, alert_id):
     logged_in_client.post(f"/alerts/{alert_id}/notes", data={"notes": "initial"})
     response = logged_in_client.post(
         f"/alerts/{alert_id}/notes",

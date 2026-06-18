@@ -1,19 +1,15 @@
-import json
 import logging
 import os
 import re
 import socket
-import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 
-import requests
+from forwarders import post_event, load_state, save_state
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
-SIEM_API_KEY = os.environ.get("SIEM_API_KEY") or os.environ.get("INGEST_API_KEY", "")
 POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
 AUTH_LOG = os.environ.get("SIEM_AUTH_LOG", "/var/log/auth.log")
 STATE_FILE = os.environ.get(
@@ -94,40 +90,12 @@ def parse_auth_log_line(line):
     return None
 
 
-def load_state():
-    if not os.path.exists(STATE_FILE):
-        return {}
-    with open(STATE_FILE) as f:
-        return json.load(f)
-
-
-def save_state(state):
-    dir_ = os.path.dirname(STATE_FILE) or "."
-    with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp") as tmp:
-        json.dump(state, tmp)
-        # O1: flush + fsync before rename so the data is durable on disk.
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp_path = tmp.name
-    os.replace(tmp_path, STATE_FILE)
-
-
-def post_event(event):
-    try:
-        headers = {"X-Api-Key": SIEM_API_KEY} if SIEM_API_KEY else {}
-        response = requests.post(f"{SIEM_URL}/ingest", json=event, headers=headers, timeout=5)
-        response.raise_for_status()
-        return True
-    except requests.exceptions.RequestException as exc:
-        logger.warning("failed to post event: %s", exc)
-        return False
-
 
 def main():
-    state = load_state()
+    state = load_state(STATE_FILE)
     if "offset" not in state:
         state["offset"] = os.path.getsize(AUTH_LOG)
-        save_state(state)
+        save_state(state, STATE_FILE)
 
     while True:
         current_size = os.path.getsize(AUTH_LOG)
@@ -147,14 +115,14 @@ def main():
                 except Exception as exc:
                     logger.warning("Failed to parse auth.log line: %s — skipping", exc)
                     state["offset"] = f.tell()
-                    save_state(state)
+                    save_state(state, STATE_FILE)
                     continue
                 if event is not None:
                     if not post_event(event):
                         break
                     logger.info("sent %s from %s", event["event_type"], event["host"])
                 state["offset"] = f.tell()
-                save_state(state)
+                save_state(state, STATE_FILE)
 
         time.sleep(POLL_INTERVAL)
 

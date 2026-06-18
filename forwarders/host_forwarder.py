@@ -8,19 +8,18 @@ No admin rights, no Sysmon, no log file required - it reports what's actually ru
 Connections are captured in both directions: outbound (this PC connected out to a peer) and
 inbound (a peer connected in to one of our listening ports) - see snapshot_connections().
 """
+import ipaddress
 import logging
 import os
 import socket
 import time
 from datetime import datetime, timezone
 
-import requests
+from forwarders import post_event
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
-SIEM_API_KEY = os.environ.get("SIEM_API_KEY") or os.environ.get("INGEST_API_KEY", "")
 POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
 
 HOST_LABEL = os.environ.get("SIEM_HOST_LABEL", socket.gethostname())
@@ -89,8 +88,6 @@ def diff_new(previous_keys, current_items, key_fn):
 
 
 def _is_public_ip(ip):
-    import ipaddress
-
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
@@ -99,8 +96,6 @@ def _is_public_ip(ip):
 
 
 def _is_loopback_or_unspecified(ip):
-    import ipaddress
-
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
@@ -131,8 +126,6 @@ def resolve_host(ip, timeout=0.3):
     if there's no PTR record, the lookup times out, or ip is private/loopback (where
     rDNS is slow and not useful). Cached (including negative results) so repeated
     connections to the same peer don't re-resolve every poll cycle."""
-    import ipaddress
-
     if ip in _RDNS_CACHE:
         return _RDNS_CACHE[ip]
 
@@ -224,16 +217,6 @@ def snapshot_connections():
         }
     return snapshot
 
-
-def post_event(event):
-    try:
-        headers = {"X-Api-Key": SIEM_API_KEY} if SIEM_API_KEY else {}
-        response = requests.post(f"{SIEM_URL}/ingest", json=event, headers=headers, timeout=5)
-        response.raise_for_status()
-        return True
-    except requests.exceptions.RequestException as exc:
-        logger.warning("failed to post event: %s", exc)
-        return False
 
 
 def main():

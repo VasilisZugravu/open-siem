@@ -1,19 +1,15 @@
-import json
 import logging
 import os
 import socket
-import tempfile
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-import requests
+from forwarders import post_event, load_state, save_state
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
-SIEM_API_KEY = os.environ.get("SIEM_API_KEY") or os.environ.get("INGEST_API_KEY", "")
 POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
 STATE_FILE = os.environ.get(
     "SIEM_STATE_FILE",
@@ -78,37 +74,6 @@ def map_sysmon_event(xml_string):
     return None
 
 
-def load_state():
-    if not os.path.exists(STATE_FILE):
-        return {}
-    with open(STATE_FILE) as f:
-        return json.load(f)
-
-
-def save_state(state):
-    dir_ = os.path.dirname(STATE_FILE) or "."
-    with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp") as tmp:
-        json.dump(state, tmp)
-        # O1: flush userspace buffer then fsync so the data reaches disk before
-        # os.replace() makes the new file visible — without this, a power loss
-        # after the rename but before the OS flushes write-back cache corrupts
-        # the state file and the forwarder re-sends all events from scratch.
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp_path = tmp.name
-    os.replace(tmp_path, STATE_FILE)
-
-
-def post_event(event):
-    try:
-        headers = {"X-Api-Key": SIEM_API_KEY} if SIEM_API_KEY else {}
-        response = requests.post(f"{SIEM_URL}/ingest", json=event, headers=headers, timeout=5)
-        response.raise_for_status()
-        return True
-    except requests.exceptions.RequestException as exc:
-        logger.warning("failed to post event: %s", exc)
-        return False
-
 
 def _record_id(xml_string):
     root = ET.fromstring(xml_string)
@@ -147,10 +112,10 @@ def _get_new_events(last_record_id):
 
 
 def main():
-    state = load_state()
+    state = load_state(STATE_FILE)
     if "last_record_id" not in state:
         state["last_record_id"] = _get_latest_record_id()
-        save_state(state)
+        save_state(state, STATE_FILE)
 
     while True:
         for record_id, xml_string in _get_new_events(state["last_record_id"]):
@@ -159,14 +124,14 @@ def main():
             except Exception as exc:
                 logger.warning("Failed to parse Sysmon event (record %s): %s — skipping", record_id, exc)
                 state["last_record_id"] = record_id
-                save_state(state)
+                save_state(state, STATE_FILE)
                 continue
             if event is not None:
                 if not post_event(event):
                     break
                 logger.info("sent %s from %s", event["event_type"], event["host"])
             state["last_record_id"] = record_id
-            save_state(state)
+            save_state(state, STATE_FILE)
 
         time.sleep(POLL_INTERVAL)
 

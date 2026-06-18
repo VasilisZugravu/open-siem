@@ -149,11 +149,15 @@ def evaluate_aggregation_rules(rules, now=None):
             ).all()
 
             conditions = detection.get("conditions", {})
-            matching = [e for e in candidates if match_conditions(event_to_dict(e), conditions)]
+            matching = []
+            for e in candidates:
+                d = event_to_dict(e)
+                if match_conditions(d, conditions):
+                    matching.append((e, d))
 
             groups = {}
-            for event in matching:
-                group_value = event_to_dict(event).get(agg["group_by"])
+            for event, edict in matching:
+                group_value = edict.get(agg["group_by"])
                 if group_value is None:
                     # Can't attribute this event to any group — bucketing it under
                     # a shared `None` key would collapse unrelated events together.
@@ -222,10 +226,11 @@ def evaluate_sequence_rules(rules, now=None):
                 .order_by(Event.timestamp, Event.id)
                 .all()
             )
-            step1_matching = [
-                e for e in candidates1
-                if match_conditions(event_to_dict(e), step1.get("conditions", {}))
-            ]
+            step1_matching = []
+            for e in candidates1:
+                d = event_to_dict(e)
+                if match_conditions(d, step1.get("conditions", {})):
+                    step1_matching.append((e, d))
 
             recent_alerts = Alert.query.filter(
                 Alert.rule_id == rule["id"],
@@ -233,8 +238,8 @@ def evaluate_sequence_rules(rules, now=None):
             ).all()
             already_alerted = {a.details.get(correlate_by) for a in recent_alerts}
 
-            for e1 in step1_matching:
-                corr_val = event_to_dict(e1).get(correlate_by)
+            for e1, e1_dict in step1_matching:
+                corr_val = e1_dict.get(correlate_by)
                 if corr_val is None:
                     # Can't correlate this event to anything specific — matching
                     # it against other events that also lack the field would
@@ -255,11 +260,11 @@ def evaluate_sequence_rules(rules, now=None):
                     .order_by(Event.timestamp, Event.id)
                     .all()
                 )
-                step2_matching = [
-                    e for e in candidates2
-                    if event_to_dict(e).get(correlate_by) == corr_val
-                    and match_conditions(event_to_dict(e), step2.get("conditions", {}))
-                ]
+                step2_matching = []
+                for e in candidates2:
+                    d = event_to_dict(e)
+                    if d.get(correlate_by) == corr_val and match_conditions(d, step2.get("conditions", {})):
+                        step2_matching.append(e)
 
                 if not step2_matching:
                     continue

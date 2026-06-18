@@ -32,10 +32,3 @@ def client(app):
                        follow_redirects=False)
     assert resp.status_code == 302, f"fixture login failed (status {resp.status_code})"
     return client
-
-
-@pytest.fixture
-def authed_app(app):
-    """Back-compat alias: auth is always enforced now, so this is just `app`
-    with the admin seeded."""
-    return app

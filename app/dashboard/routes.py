@@ -221,7 +221,7 @@ def heatmap():
     return render_template("heatmap.html", rows=rows)
 
 
-def _event_explorer_data(host, event_type, search):
+def _event_explorer_data(host, event_type, search, include_filters=True):
     """Shared query for the event explorer page render and its /api/events poll."""
     query = Event.query
 
@@ -238,6 +238,9 @@ def _event_explorer_data(host, event_type, search):
         )
 
     events = query.order_by(Event.timestamp.desc()).limit(100).all()
+
+    if not include_filters:
+        return events, [], []
 
     hosts_query = db.session.query(Event.host).distinct()
     if event_type:
@@ -286,7 +289,7 @@ def api_events():
     host = request.args.get("host") or None
     event_type = request.args.get("event_type") or None
     search = request.args.get("search") or None
-    events, _hosts, _event_types = _event_explorer_data(host, event_type, search)
+    events, _hosts, _event_types = _event_explorer_data(host, event_type, search, include_filters=False)
     return jsonify({"events": [_event_to_dict(e) for e in events]})
 
 

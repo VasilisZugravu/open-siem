@@ -111,13 +111,9 @@ gitignored — generate secret values with
    seeded automatically — set `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars to
    override.
 
-6. **(Optional) seed demo data** so the dashboard has something to show:
+6. **Open** http://localhost:5000 and log in with `admin` / `demo`.
 
-   ```bash
-   python scripts/seed_demo_data.py
-   ```
-
-7. **Open** http://localhost:5000 and log in with `admin` / `demo`.
+   See [Generating demo data](#generating-demo-data) to populate the dashboard.
 
 ## Dashboard login
 
@@ -141,14 +137,14 @@ Omit `--password` to be prompted interactively.
 
 ## Generating demo data
 
-With the app running, seed synthetic events covering all detection rules:
+The quickest way is the **Synthetic Traffic** feed on the dashboard (no CLI
+needed) — click **Start** next to it and alerts will appear within ~30 seconds.
+
+To seed via CLI instead:
 
 ```bash
 python scripts/seed_demo_data.py
 ```
-
-Within one detection cycle (~30 seconds) alerts for all rules should appear
-on the dashboard at http://localhost:5000.
 
 For the sequence rule (RULE-009), seed an `auth_success` followed by a
 `useradd` event on the same host within 10 minutes — the detection cycle will
@@ -241,30 +237,36 @@ This polls `/api/alerts` for each rule and writes results to
 
 ## Dashboard
 
-- `/` — Alert feed: overview charts (alerts per hour, alerts by severity) plus
-  a table of recent alerts
+- `/` — Alert feed: stat cards (total alerts / last 24h / critical / active
+  feeds), a **Telemetry Feeds** control panel (start/stop each feed, LIVE/PAUSE
+  toggle), and charts (alerts per hour, severity breakdown) plus a sortable
+  alert table
 - `/alerts/<id>` — Alert detail: rule metadata, triggering events with mock
   geo/ASN enrichment, triage status dropdown, and timestamped analyst notes
 - `/heatmap` — ATT&CK coverage heatmap: every rule's tactic/technique, marked
   "fired" once it has produced at least one alert
-- `/events` — Event explorer: filter raw ingested events by host, event type,
-  or free-text search; shows mock country · AS for public source IPs
+- `/events` — Event Explorer: filter raw ingested events by host, event type,
+  or free-text search; shows direction and mock country · AS for public source IPs
 
 ## Screenshots
 
-**Alert feed** — bar chart (alerts/hour) + severity donut + sortable alert table
+**Dashboard** — stat cards + Telemetry Feeds control panel (LIVE/PAUSE, per-feed Start/Stop)
+
+![Dashboard](docs/img/dashboard.png)
+
+**Alert feed** — severity-badged alert table with ATT&CK technique, host, and status per row
 
 ![Alert feed](docs/img/alert-feed.png)
 
-**ATT&CK Coverage Heatmap** — every rule fired across 5 tactics
+**ATT&CK Coverage Heatmap** — every rule mapped to MITRE tactic/technique, FIRED once triggered
 
 ![ATT&CK heatmap](docs/img/heatmap.png)
 
-**Event Explorer** — filterable event table with mock geo/ASN enrichment
+**Event Explorer** — filterable raw-event table with direction and mock geo/ASN enrichment
 
 ![Event explorer](docs/img/event-explorer.png)
 
-**Alert detail** — RULE-009 two-step correlation showing both triggering events
+**Alert detail** — rule metadata, triggering events, triage status dropdown, and analyst notes
 
 ![Alert detail](docs/img/alert-detail.png)
 
