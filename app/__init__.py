@@ -24,6 +24,13 @@ def create_app(config=None):
         "DATABASE_URL", "sqlite:///siem.db"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Cap request bodies app-wide: Flask rejects anything larger with 413 before
+    # any handler runs, so /ingest can't be made to parse a huge JSON body into
+    # memory ahead of its per-field length checks. 1 MB comfortably fits a real
+    # event (command_line/raw cap at 8 KB each). Override via MAX_CONTENT_LENGTH.
+    app.config["MAX_CONTENT_LENGTH"] = int(
+        os.environ.get("MAX_CONTENT_LENGTH", 1 * 1024 * 1024)
+    )
     app.config["INGEST_API_KEY"] = os.environ.get("INGEST_API_KEY")
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 

@@ -73,7 +73,15 @@ gitignored — generate secret values with
    pip install -r requirements.txt
    ```
 
-2. **(Production only) set secrets** — `run.py` provides dev-safe defaults
+2. **(Production only) run behind a reverse proxy** — the app uses
+   `ProxyFix` to key rate limits (login throttle, `/ingest`) on the real
+   client IP from `X-Forwarded-For`. If the app is exposed directly to a
+   public interface without a trusted proxy (Nginx, the compose service, a
+   load balancer) in front of it, clients can spoof that header and bypass
+   per-IP rate limiting. Always place a reverse proxy between the app and
+   untrusted networks in production.
+
+3. **(Production only) set secrets** — `run.py` provides dev-safe defaults
    when run directly, so this step is only needed for production or gunicorn:
 
    ```bash
@@ -87,13 +95,13 @@ gitignored — generate secret values with
    `ALLOW_UNAUTHENTICATED_INGEST=1` instead. The bundled forwarders and
    scripts read `SIEM_API_KEY` first, then fall back to `INGEST_API_KEY`.
 
-3. **(Optional) point at Postgres instead of SQLite:**
+4. **(Optional) point at Postgres instead of SQLite:**
 
    ```bash
    export DATABASE_URL=postgresql://siem:siem@localhost:5432/siem
    ```
 
-4. **Start the app:**
+5. **Start the app:**
 
    ```bash
    python run.py
@@ -103,13 +111,13 @@ gitignored — generate secret values with
    seeded automatically — set `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars to
    override.
 
-5. **(Optional) seed demo data** so the dashboard has something to show:
+6. **(Optional) seed demo data** so the dashboard has something to show:
 
    ```bash
    python scripts/seed_demo_data.py
    ```
 
-6. **Open** http://localhost:5000 and log in with `admin` / `demo`.
+7. **Open** http://localhost:5000 and log in with `admin` / `demo`.
 
 ## Dashboard login
 

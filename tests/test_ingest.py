@@ -252,6 +252,29 @@ def test_ingest_rejects_oversized_host(client):
     assert "host" in resp.get_json()["error"]
 
 
+# ── request body size cap (MAX_CONTENT_LENGTH) ───────────────────────────────
+
+def test_ingest_rejects_oversized_request_body():
+    """A body larger than MAX_CONTENT_LENGTH must be rejected with 413 by Flask
+    before the handler parses it into memory. Use a tiny cap so the test stays
+    fast and doesn't allocate a megabyte."""
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "TESTING": True,
+        "INGEST_API_KEY": "test-secret",
+        "MAX_CONTENT_LENGTH": 512,
+    })
+    with app.app_context():
+        client = app.test_client()
+        resp = client.post(
+            "/ingest",
+            data="x" * 1024,
+            content_type="application/json",
+            headers={"X-Api-Key": "test-secret"},
+        )
+        assert resp.status_code == 413
+
+
 # ── W12: details type validation ─────────────────────────────────────────────
 
 def test_ingest_rejects_non_dict_details(client):
