@@ -70,6 +70,13 @@ def create_app(config=None):
         app.config["SESSION_COOKIE_SECURE"] = not app.config.get("TESTING")
 
     db.init_app(app)
+
+    # M5: Trust exactly one X-Forwarded-For hop from the compose proxy so the
+    # login throttle (keyed on request.remote_addr) sees the real client IP
+    # rather than the proxy's IP.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
+
     app.jinja_env.filters["athens_time"] = to_athens_time
 
     # Baseline hardening headers. The dashboard renders attacker-influenced
@@ -112,7 +119,11 @@ def create_app(config=None):
     with app.app_context():
         db.create_all()
 
-    app.config.setdefault("START_SCHEDULER", not app.config.get("TESTING"))
+    # L3: skip the in-process scheduler if the caller opts out — multi-worker
+    # gunicorn deployments should set FLASK_SKIP_SCHEDULER=1 on all but one
+    # worker (or run the scheduler in a dedicated process).
+    skip_scheduler = os.environ.get("FLASK_SKIP_SCHEDULER") == "1"
+    app.config.setdefault("START_SCHEDULER", not app.config.get("TESTING") and not skip_scheduler)
     if app.config.get("START_SCHEDULER"):
         from app.scheduler import start_background_loop
         start_background_loop(app)

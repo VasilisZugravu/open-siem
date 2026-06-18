@@ -35,12 +35,11 @@ def test_private_loopback(  ):
     assert result["is_private"] is True
 
 
-def test_invalid_ip_string_does_not_crash():
+def test_invalid_ip_string_returns_none():
+    # L10a: an unparseable IP is not known to be private — return None (no enrichment)
     from app.enrichment import enrich_ip
     result = enrich_ip("not-an-ip")
-    assert result is not None
-    assert result["is_private"] is True
-    assert result["country"] is None
+    assert result is None
 
 
 def test_public_ip_returns_enrichment_dict():

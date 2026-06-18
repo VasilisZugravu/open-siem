@@ -68,7 +68,8 @@ def enrich_ip(ip: str | None) -> dict | None:
         if not is_private:
             is_private = any(addr in net for net in _PRIVATE_NETS)
     except ValueError:
-        return {"is_private": True, "country": None, "asn": None, "asn_org": None}
+        # Not parseable: we don't know if private or public — return None (no enrichment)
+        return None
 
     if is_private:
         return {"is_private": True, "country": None, "asn": None, "asn_org": None}

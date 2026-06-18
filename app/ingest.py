@@ -1,4 +1,6 @@
 import secrets
+import threading
+import time
 from datetime import datetime, timezone
 from flask import Blueprint, current_app, request, jsonify
 from app.db import db
@@ -9,6 +11,41 @@ ingest_bp = Blueprint("ingest", __name__)
 
 REQUIRED_FIELDS = ["timestamp", "host", "event_type"]
 
+MAX_FIELD_LEN = 8192  # maximum allowed bytes for long free-text fields
+
+INGEST_MAX_REQUESTS = 600
+INGEST_WINDOW_SECONDS = 60
+_ingest_rate_lock = threading.Lock()
+
+
+def _ingest_rate_store():
+    return current_app.extensions.setdefault("ingest_rate", {})
+
+
+def _ingest_rate_limited(ip):
+    with _ingest_rate_lock:
+        store = _ingest_rate_store()
+        entry = store.get(ip)
+        if entry is None:
+            return False
+        count, window_start = entry
+        if time.monotonic() - window_start > INGEST_WINDOW_SECONDS:
+            del store[ip]
+            return False
+        return count >= INGEST_MAX_REQUESTS
+
+
+def _record_ingest_request(ip):
+    with _ingest_rate_lock:
+        store = _ingest_rate_store()
+        entry = store.get(ip)
+        now = time.monotonic()
+        if entry is None or now - entry[1] > INGEST_WINDOW_SECONDS:
+            store[ip] = (1, now)
+        else:
+            count, window_start = entry
+            store[ip] = (count + 1, window_start)
+
 
 @ingest_bp.route("/ingest", methods=["POST"])
 def ingest_event():
@@ -16,9 +53,21 @@ def ingest_event():
     if expected_key and not secrets.compare_digest(request.headers.get("X-Api-Key", ""), expected_key):
         return jsonify({"error": "unauthorized"}), 401
 
+    _record_ingest_request(request.remote_addr)
+    if _ingest_rate_limited(request.remote_addr):
+        return jsonify({"error": "rate limit exceeded"}), 429
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "invalid JSON body"}), 400
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+
+    for field in ("command_line", "raw"):
+        val = data.get(field)
+        if val and len(str(val)) > MAX_FIELD_LEN:
+            return jsonify({"error": f"field '{field}' exceeds {MAX_FIELD_LEN} bytes"}), 400
 
     for field in REQUIRED_FIELDS:
         if field not in data:
