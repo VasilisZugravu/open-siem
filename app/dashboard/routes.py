@@ -1,6 +1,4 @@
 import secrets
-import threading
-import time
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app, session
@@ -8,6 +6,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import to_athens_time
+from app._rate_limit import is_rate_limited, record_request, clear as rl_clear
 from app.db import db
 from app.feeds import FEEDS, feed_manager
 from app.models import Alert, Event, User
@@ -35,77 +34,10 @@ _DUMMY_PASSWORD_HASH = generate_password_hash("", method="pbkdf2:sha256")
 # instance (and each test's fresh app) starts with a clean slate.
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_LOCKOUT_WINDOW_SECONDS = 300
-_login_attempts_lock = threading.Lock()
-
-
-def _login_attempts_store():
-    return current_app.extensions.setdefault("login_attempts", {})
-
-
-def _login_rate_limited(ip):
-    """True if `ip` has hit LOGIN_MAX_ATTEMPTS failures within the window."""
-    with _login_attempts_lock:
-        store = _login_attempts_store()
-        entry = store.get(ip)
-        if entry is None:
-            return False
-        count, window_start = entry
-        if time.monotonic() - window_start > LOGIN_LOCKOUT_WINDOW_SECONDS:
-            del store[ip]
-            return False
-        return count >= LOGIN_MAX_ATTEMPTS
-
-
-def _record_login_failure(ip):
-    with _login_attempts_lock:
-        store = _login_attempts_store()
-        entry = store.get(ip)
-        now = time.monotonic()
-        if entry is None or now - entry[1] > LOGIN_LOCKOUT_WINDOW_SECONDS:
-            store[ip] = (1, now)
-        else:
-            count, window_start = entry
-            store[ip] = (count + 1, window_start)
-
-
-def _clear_login_failures(ip):
-    with _login_attempts_lock:
-        _login_attempts_store().pop(ip, None)
-
 
 # Per-IP rate limiting for /api/alerts — same pattern as the login throttle.
 API_ALERTS_MAX_REQUESTS = 600
 API_ALERTS_WINDOW_SECONDS = 60
-_api_alerts_rate_lock = threading.Lock()
-
-
-def _api_alerts_rate_store():
-    return current_app.extensions.setdefault("api_alerts_rate", {})
-
-
-def _api_alerts_rate_limited(ip):
-    with _api_alerts_rate_lock:
-        store = _api_alerts_rate_store()
-        entry = store.get(ip)
-        if entry is None:
-            return False
-        count, window_start = entry
-        if time.monotonic() - window_start > API_ALERTS_WINDOW_SECONDS:
-            del store[ip]
-            return False
-        return count >= API_ALERTS_MAX_REQUESTS
-
-
-def _record_api_alerts_request(ip):
-    with _api_alerts_rate_lock:
-        store = _api_alerts_rate_store()
-        entry = store.get(ip)
-        now = time.monotonic()
-        if entry is None or now - entry[1] > API_ALERTS_WINDOW_SECONDS:
-            store[ip] = (1, now)
-        else:
-            count, window_start = entry
-            store[ip] = (count + 1, window_start)
 
 
 def _is_safe_redirect_target(target):
@@ -381,7 +313,7 @@ def event_explorer():
 @dashboard_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if _login_rate_limited(request.remote_addr):
+        if is_rate_limited("login_attempts", request.remote_addr, LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_WINDOW_SECONDS):
             flash("Too many failed login attempts. Try again later.")
             return render_template("login.html"), 429
 
@@ -391,14 +323,14 @@ def login():
         if user is None:
             check_password_hash(_DUMMY_PASSWORD_HASH, password)  # equalize timing
         elif user.check_password(password):
-            _clear_login_failures(request.remote_addr)
+            rl_clear("login_attempts", request.remote_addr)
             session.pop("_csrf_token", None)  # L6: rotate CSRF token on login
             login_user(user)
             next_page = request.args.get("next")
             if not _is_safe_redirect_target(next_page):
                 next_page = url_for("dashboard.alert_feed")
             return redirect(next_page)
-        _record_login_failure(request.remote_addr)
+        record_request("login_attempts", request.remote_addr, LOGIN_LOCKOUT_WINDOW_SECONDS)
         flash("Invalid username or password.")
     return render_template("login.html")
 
@@ -424,9 +356,9 @@ def api_alerts():
         return jsonify({"error": "unauthorized"}), 401
 
     # W4: check before record so exactly API_ALERTS_MAX_REQUESTS succeed per window.
-    if _api_alerts_rate_limited(request.remote_addr):
+    if is_rate_limited("api_alerts_rate", request.remote_addr, API_ALERTS_MAX_REQUESTS, API_ALERTS_WINDOW_SECONDS):
         return jsonify({"error": "rate limit exceeded"}), 429
-    _record_api_alerts_request(request.remote_addr)
+    record_request("api_alerts_rate", request.remote_addr, API_ALERTS_WINDOW_SECONDS)
 
     rule_id = request.args.get("rule_id")
     since = request.args.get("since")

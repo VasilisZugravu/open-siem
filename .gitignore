@@ -13,3 +13,4 @@ docs/superpowers/
 
 # downloaded/cached third-party datasets for scripts/replay_dataset.py
 data/
+.gstack/

@@ -1,11 +1,10 @@
 import secrets
-import threading
-import time
 from datetime import datetime, timezone
 from flask import Blueprint, current_app, request, jsonify
 from app.db import db
 from app.models import Event
 from app.enrichment import enrich_ip
+from app._rate_limit import is_rate_limited, record_request
 
 ingest_bp = Blueprint("ingest", __name__)
 
@@ -15,36 +14,6 @@ MAX_FIELD_LEN = 8192  # maximum allowed bytes for long free-text fields
 
 INGEST_MAX_REQUESTS = 600
 INGEST_WINDOW_SECONDS = 60
-_ingest_rate_lock = threading.Lock()
-
-
-def _ingest_rate_store():
-    return current_app.extensions.setdefault("ingest_rate", {})
-
-
-def _ingest_rate_limited(ip):
-    with _ingest_rate_lock:
-        store = _ingest_rate_store()
-        entry = store.get(ip)
-        if entry is None:
-            return False
-        count, window_start = entry
-        if time.monotonic() - window_start > INGEST_WINDOW_SECONDS:
-            del store[ip]
-            return False
-        return count >= INGEST_MAX_REQUESTS
-
-
-def _record_ingest_request(ip):
-    with _ingest_rate_lock:
-        store = _ingest_rate_store()
-        entry = store.get(ip)
-        now = time.monotonic()
-        if entry is None or now - entry[1] > INGEST_WINDOW_SECONDS:
-            store[ip] = (1, now)
-        else:
-            count, window_start = entry
-            store[ip] = (count + 1, window_start)
 
 
 @ingest_bp.route("/ingest", methods=["POST"])
@@ -54,9 +23,9 @@ def ingest_event():
         return jsonify({"error": "unauthorized"}), 401
 
     # W4: check before record so exactly MAX_REQUESTS succeed before the 429.
-    if _ingest_rate_limited(request.remote_addr):
+    if is_rate_limited("ingest_rate", request.remote_addr, INGEST_MAX_REQUESTS, INGEST_WINDOW_SECONDS):
         return jsonify({"error": "rate limit exceeded"}), 429
-    _record_ingest_request(request.remote_addr)
+    record_request("ingest_rate", request.remote_addr, INGEST_WINDOW_SECONDS)
 
     data = request.get_json(silent=True)
     if not data:

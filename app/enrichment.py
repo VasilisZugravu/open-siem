@@ -39,19 +39,6 @@ _ASNS = [
     (32590, "Valve Corporation"),
 ]
 
-_PRIVATE = (
-    "10.0.0.0/8",
-    "172.16.0.0/12",
-    "192.168.0.0/16",
-    "127.0.0.0/8",
-    "169.254.0.0/16",
-    "::1/128",
-    "fc00::/7",
-    "fe80::/10",
-)
-_PRIVATE_NETS = [ipaddress.ip_network(n) for n in _PRIVATE]
-
-
 def enrich_ip(ip: str | None) -> dict | None:
     """Return {country, asn, asn_org, is_private} for ip, or None if ip is absent.
 
@@ -65,8 +52,6 @@ def enrich_ip(ip: str | None) -> dict | None:
     try:
         addr = ipaddress.ip_address(ip)
         is_private = addr.is_private or addr.is_loopback or addr.is_link_local
-        if not is_private:
-            is_private = any(addr in net for net in _PRIVATE_NETS)
     except ValueError:
         # Not parseable: we don't know if private or public — return None (no enrichment)
         return None

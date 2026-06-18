@@ -69,13 +69,14 @@ def test_api_alerts_invalid_since_returns_400(client):
 
 def test_api_alerts_rate_limit_blocks_at_limit(app, client, monkeypatch):
     """/api/alerts must return 429 when the per-IP counter reaches API_ALERTS_MAX_REQUESTS."""
-    from app.dashboard import routes as dashboard_routes
+    import app._rate_limit as _rl
+    from app.dashboard.routes import API_ALERTS_MAX_REQUESTS
 
     clock = {"t": 0.0}
-    monkeypatch.setattr(dashboard_routes.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(_rl.time, "monotonic", lambda: clock["t"])
 
     app.extensions["api_alerts_rate"] = {
-        "127.0.0.1": (dashboard_routes.API_ALERTS_MAX_REQUESTS, 0.0)
+        "127.0.0.1": (API_ALERTS_MAX_REQUESTS, 0.0)
     }
     resp = client.get("/api/alerts")
     assert resp.status_code == 429
@@ -84,14 +85,15 @@ def test_api_alerts_rate_limit_blocks_at_limit(app, client, monkeypatch):
 
 def test_api_alerts_rate_limit_resets_after_window(app, client, monkeypatch):
     """After the rate window expires the IP is unthrottled."""
-    from app.dashboard import routes as dashboard_routes
+    import app._rate_limit as _rl
+    from app.dashboard.routes import API_ALERTS_MAX_REQUESTS, API_ALERTS_WINDOW_SECONDS
 
     clock = {"t": 0.0}
-    monkeypatch.setattr(dashboard_routes.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(_rl.time, "monotonic", lambda: clock["t"])
 
     app.extensions["api_alerts_rate"] = {
-        "127.0.0.1": (dashboard_routes.API_ALERTS_MAX_REQUESTS, 0.0)
+        "127.0.0.1": (API_ALERTS_MAX_REQUESTS, 0.0)
     }
     assert client.get("/api/alerts").status_code == 429
-    clock["t"] = dashboard_routes.API_ALERTS_WINDOW_SECONDS + 1
+    clock["t"] = API_ALERTS_WINDOW_SECONDS + 1
     assert client.get("/api/alerts").status_code == 200

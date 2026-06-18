@@ -244,18 +244,19 @@ def test_login_lockout_is_scoped_per_client_ip(authed_app):
 
 
 def test_login_lockout_expires_after_the_window(authed_client, monkeypatch):
-    from app.dashboard import routes
+    import app._rate_limit as _rl
     from app.dashboard.routes import LOGIN_MAX_ATTEMPTS
 
     clock = {"now": 1000.0}
-    monkeypatch.setattr(routes.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(_rl.time, "monotonic", lambda: clock["now"])
 
     for _ in range(LOGIN_MAX_ATTEMPTS):
         authed_client.post("/login", data={"username": "admin", "password": "wrong"})
     locked = authed_client.post("/login", data={"username": "admin", "password": "wrong"})
     assert locked.status_code == 429
 
-    clock["now"] += routes.LOGIN_LOCKOUT_WINDOW_SECONDS + 1
+    from app.dashboard.routes import LOGIN_LOCKOUT_WINDOW_SECONDS
+    clock["now"] += LOGIN_LOCKOUT_WINDOW_SECONDS + 1
 
     response = authed_client.post(
         "/login", data={"username": "admin", "password": "secret"}, follow_redirects=False
