@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-import pytest
 import yaml
 
 from app.db import db
@@ -166,11 +165,11 @@ def test_sequence_step2_selection_is_deterministic_on_equal_timestamps(app):
     the one with the lowest id must always be selected (stable sort by id).
     Without the id tiebreak in order_by(), the pick is non-deterministic across
     DB engines."""
-    e1 = _event("host-a", "step_one", _BASE)
+    _event("host-a", "step_one", _BASE)
 
     # Two step-2 candidates with exactly the same timestamp
     e2_a = _event("host-a", "step_two", _BASE + timedelta(seconds=5))
-    e2_b = _event("host-a", "step_two", _BASE + timedelta(seconds=5))
+    _event("host-a", "step_two", _BASE + timedelta(seconds=5))
 
     now = _BASE + timedelta(seconds=60)
     evaluate_sequence_rules([_RULE], now=now)

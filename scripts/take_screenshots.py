@@ -1,5 +1,4 @@
 """Capture 4 dashboard screenshots into docs/img/."""
-import os
 import time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -17,7 +16,8 @@ PAGES = [
 
 
 def get_first_alert_id():
-    import urllib.request, json
+    import urllib.request
+    import json
     with urllib.request.urlopen(f"{BASE}/api/alerts") as r:
         alerts = json.load(r)
     if not alerts:

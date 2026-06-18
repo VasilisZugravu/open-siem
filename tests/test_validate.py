@@ -28,7 +28,7 @@ def test_write_coverage_md_all_passing(tmp_path):
     assert len(SCENARIOS) == 12
     assert "RULE-010" in content
     assert "RULE-012" in content
-    data_rows = [l for l in content.splitlines() if l.startswith("| ") and "Scenario" not in l and "---" not in l]
+    data_rows = [line for line in content.splitlines() if line.startswith("| ") and "Scenario" not in line and "---" not in line]
     assert len(data_rows) == 12
 
 
@@ -59,7 +59,7 @@ def test_single_scenario_run_preserves_other_rows(tmp_path):
     _write_coverage_md([results[n] for n in sorted(results)], out)
 
     content = Path(out).read_text(encoding="utf-8")
-    row_01 = next(l for l in content.splitlines() if l.startswith("| 01 |"))
+    row_01 = next(line for line in content.splitlines() if line.startswith("| 01 |"))
     assert "❌" in row_01
     # every other scenario's prior ✅ must survive, not reset to the pending placeholder
     assert content.count("✅") == 11

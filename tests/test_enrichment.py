@@ -1,4 +1,3 @@
-import pytest
 from app.db import db
 from app.models import Event
 

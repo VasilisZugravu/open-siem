@@ -1,7 +1,6 @@
 import pytest
 from app import create_app
 from app.cli import ensure_admin
-from app.db import db
 
 
 @pytest.fixture
