@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}404 Not Found — SIEM{% endblock %}
+{% block content %}
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height:50vh;gap:1rem;text-align:center;">
+  <div style="font-size:4rem;font-weight:700;color:var(--color-text-muted,#6c757d);">404</div>
+  <div style="font-size:1.25rem;font-weight:500;">Page not found</div>
+  <a href="{{ url_for('dashboard.alert_feed') }}" class="btn btn-primary">Back to Alert Feed</a>
+</div>
+{% endblock %}

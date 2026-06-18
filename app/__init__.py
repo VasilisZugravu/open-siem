@@ -119,6 +119,11 @@ def create_app(config=None):
     with app.app_context():
         db.create_all()
 
+    @app.errorhandler(404)
+    def not_found(e):
+        from flask import render_template
+        return render_template("404.html"), 404
+
     # L3: skip the in-process scheduler if the caller opts out — multi-worker
     # gunicorn deployments should set FLASK_SKIP_SCHEDULER=1 on all but one
     # worker (or run the scheduler in a dedicated process).
