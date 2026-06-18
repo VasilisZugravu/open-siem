@@ -89,6 +89,12 @@ def save_state(state):
     dir_ = os.path.dirname(STATE_FILE) or "."
     with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp") as tmp:
         json.dump(state, tmp)
+        # O1: flush userspace buffer then fsync so the data reaches disk before
+        # os.replace() makes the new file visible — without this, a power loss
+        # after the rename but before the OS flushes write-back cache corrupts
+        # the state file and the forwarder re-sends all events from scratch.
+        tmp.flush()
+        os.fsync(tmp.fileno())
         tmp_path = tmp.name
     os.replace(tmp_path, STATE_FILE)
 

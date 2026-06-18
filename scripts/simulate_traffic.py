@@ -10,7 +10,7 @@ import os
 import random
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -27,7 +27,7 @@ ATTACKER_IPS = ["45.155.205.233", "198.51.100.23", "203.0.113.50"]
 
 
 def _now_iso(offset_seconds=0):
-    return (datetime.utcnow() + timedelta(seconds=offset_seconds)).isoformat()
+    return (datetime.now(timezone.utc) + timedelta(seconds=offset_seconds)).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ def build_benign_events():
 
 def attack_ssh_bruteforce():
     """RULE-001 (T1110): 6 failed SSH logins from one IP within 60s."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ip = random.choice(ATTACKER_IPS)
     return [
         {
@@ -204,7 +204,7 @@ def attack_c2_port():
 
 def attack_brute_then_persist():
     """RULE-009 (T1136.001): auth_success followed by useradd on same host within 10 min."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ip = random.choice(ATTACKER_IPS)
     return [
         {

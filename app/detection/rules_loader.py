@@ -4,6 +4,10 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+# These are the fields checked by load_rule_file's cheap presence-guard before
+# Pydantic validation. `description` is also required by the Pydantic schema but
+# is not listed here — load_rules calls validate_rules() after this check, so a
+# rule missing `description` will be caught and skipped at the Pydantic stage.
 REQUIRED_FIELDS = ["id", "title", "severity", "attack_technique", "attack_tactic", "detection"]
 
 # M2: Mtime-based cache so the scheduler's 30s loop doesn't re-parse and
@@ -22,7 +26,7 @@ def _dir_mtimes(rules_dir):
 
 
 def load_rule_file(path):
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         rule = yaml.safe_load(f)
 
     for field in REQUIRED_FIELDS:
@@ -40,7 +44,9 @@ def load_rules(rules_dir):
     current_mtimes = _dir_mtimes(rules_dir)
     cached = _cache.get(rules_dir)
     if cached is not None and cached["mtimes"] == current_mtimes:
-        return cached["rules"]
+        # C1: Return a shallow copy so callers cannot mutate the cached list and
+        # corrupt subsequent detection cycles.
+        return list(cached["rules"])
 
     # M2: Import here to avoid a circular import at module load time.
     from app.detection.schema import validate_rules as _pydantic_validate
@@ -57,5 +63,7 @@ def load_rules(rules_dir):
         except Exception as exc:
             logger.warning("Skipping invalid rule file %s: %s", path, exc)
 
-    _cache[rules_dir] = {"mtimes": current_mtimes, "rules": rules}
+    # C1: store an independent copy so a caller who mutates the returned list
+    # cannot corrupt the cached copy for subsequent cycles.
+    _cache[rules_dir] = {"mtimes": current_mtimes, "rules": list(rules)}
     return rules

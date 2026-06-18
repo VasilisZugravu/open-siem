@@ -63,3 +63,35 @@ def test_api_alerts_invalid_since_returns_400(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert "error" in data
+
+
+# ── T2: /api/alerts rate limiter ─────────────────────────────────────────────
+
+def test_api_alerts_rate_limit_blocks_at_limit(app, client, monkeypatch):
+    """/api/alerts must return 429 when the per-IP counter reaches API_ALERTS_MAX_REQUESTS."""
+    from app.dashboard import routes as dashboard_routes
+
+    clock = {"t": 0.0}
+    monkeypatch.setattr(dashboard_routes.time, "monotonic", lambda: clock["t"])
+
+    app.extensions["api_alerts_rate"] = {
+        "127.0.0.1": (dashboard_routes.API_ALERTS_MAX_REQUESTS, 0.0)
+    }
+    resp = client.get("/api/alerts")
+    assert resp.status_code == 429
+    assert "rate limit" in resp.get_json()["error"]
+
+
+def test_api_alerts_rate_limit_resets_after_window(app, client, monkeypatch):
+    """After the rate window expires the IP is unthrottled."""
+    from app.dashboard import routes as dashboard_routes
+
+    clock = {"t": 0.0}
+    monkeypatch.setattr(dashboard_routes.time, "monotonic", lambda: clock["t"])
+
+    app.extensions["api_alerts_rate"] = {
+        "127.0.0.1": (dashboard_routes.API_ALERTS_MAX_REQUESTS, 0.0)
+    }
+    assert client.get("/api/alerts").status_code == 429
+    clock["t"] = dashboard_routes.API_ALERTS_WINDOW_SECONDS + 1
+    assert client.get("/api/alerts").status_code == 200

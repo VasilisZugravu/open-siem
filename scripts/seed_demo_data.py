@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -18,7 +18,7 @@ def post_event(base_url, event):
 
 def build_demo_events():
     """Build 18 synthetic events covering all 12 detection rules."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     events = []
 
     # Scenario 1 (RULE-001, T1110): 6 failed SSH logins from one IP within 60s

@@ -423,9 +423,10 @@ def api_alerts():
         # to anyone, instead of falling back to "open to the world".
         return jsonify({"error": "unauthorized"}), 401
 
-    _record_api_alerts_request(request.remote_addr)
+    # W4: check before record so exactly API_ALERTS_MAX_REQUESTS succeed per window.
     if _api_alerts_rate_limited(request.remote_addr):
         return jsonify({"error": "rate limit exceeded"}), 429
+    _record_api_alerts_request(request.remote_addr)
 
     rule_id = request.args.get("rule_id")
     since = request.args.get("since")

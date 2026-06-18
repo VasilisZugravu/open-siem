@@ -20,6 +20,13 @@ __pycache__/
 dist/
 build/
 
+# Dataset files (log samples used for replay/testing)
+data/
+
+# Forwarder state files (runtime artefacts, not source)
+.windows_forwarder_state.json
+.linux_forwarder_state.json
+
 # Editor and OS noise
 .DS_Store
 *.swp

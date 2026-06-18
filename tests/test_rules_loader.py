@@ -152,11 +152,16 @@ def test_load_rules_skips_rule_with_bad_id_format(tmp_path):
 
 
 def test_load_rules_caches_unchanged_directory(tmp_path):
-    """M2: Repeated calls without file-system changes must return the same
-    list object (mtime-based cache hit)."""
+    """M2/C1: Repeated calls without file-system changes must use the mtime
+    cache (equal content) and must return independent copies so callers cannot
+    corrupt the cache by mutating the returned list."""
     (tmp_path / "rule.yml").write_text(yaml.dump(_valid_rule_data()))
 
     result1 = load_rules(str(tmp_path))
     result2 = load_rules(str(tmp_path))
 
-    assert result1 is result2
+    assert result1 == result2
+    # C1: mutating the returned list must not corrupt subsequent cache hits.
+    result1.clear()
+    result3 = load_rules(str(tmp_path))
+    assert len(result3) == 1

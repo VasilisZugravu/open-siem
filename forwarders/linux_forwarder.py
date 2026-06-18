@@ -105,6 +105,9 @@ def save_state(state):
     dir_ = os.path.dirname(STATE_FILE) or "."
     with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp") as tmp:
         json.dump(state, tmp)
+        # O1: flush + fsync before rename so the data is durable on disk.
+        tmp.flush()
+        os.fsync(tmp.fileno())
         tmp_path = tmp.name
     os.replace(tmp_path, STATE_FILE)
 
@@ -137,7 +140,15 @@ def main():
                 line = f.readline()
                 if not line.endswith("\n"):
                     break
-                event = parse_auth_log_line(line.rstrip("\n"))
+                # O7: guard per-line parse errors so a malformed line doesn't
+                # crash the forwarder loop (mirrors windows_forwarder.py).
+                try:
+                    event = parse_auth_log_line(line.rstrip("\n"))
+                except Exception as exc:
+                    logger.warning("Failed to parse auth.log line: %s — skipping", exc)
+                    state["offset"] = f.tell()
+                    save_state(state)
+                    continue
                 if event is not None:
                     if not post_event(event):
                         break

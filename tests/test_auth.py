@@ -350,3 +350,27 @@ def test_post_with_valid_csrf_token_succeeds(csrf_app):
         follow_redirects=False,
     )
     assert response.status_code == 302
+
+
+# ── T4: CSRF token rotation on login ─────────────────────────────────────────
+
+def test_csrf_token_is_rotated_on_successful_login(csrf_app):
+    """After a successful login the pre-login CSRF token must be invalidated so
+    an attacker who pre-seeded a known token in the session cannot reuse it."""
+    c = csrf_app.test_client()
+    c.get("/login")  # seeds _csrf_token in the session
+    with c.session_transaction() as s:
+        pre_token = s.get("_csrf_token")
+    assert pre_token is not None, "login page should populate a CSRF token"
+
+    c.post(
+        "/login",
+        data={"username": "admin", "password": "secret", "csrf_token": pre_token},
+        follow_redirects=False,
+    )
+
+    # session.pop("_csrf_token") on login removes the old token; a new one is
+    # generated lazily on the next page render — so post_token should be absent.
+    with c.session_transaction() as s:
+        post_token = s.get("_csrf_token")
+    assert post_token != pre_token, "old CSRF token must not survive login"

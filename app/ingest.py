@@ -53,9 +53,10 @@ def ingest_event():
     if expected_key and not secrets.compare_digest(request.headers.get("X-Api-Key", ""), expected_key):
         return jsonify({"error": "unauthorized"}), 401
 
-    _record_ingest_request(request.remote_addr)
+    # W4: check before record so exactly MAX_REQUESTS succeed before the 429.
     if _ingest_rate_limited(request.remote_addr):
         return jsonify({"error": "rate limit exceeded"}), 429
+    _record_ingest_request(request.remote_addr)
 
     data = request.get_json(silent=True)
     if not data:
@@ -68,6 +69,17 @@ def ingest_event():
         val = data.get(field)
         if val and len(str(val)) > MAX_FIELD_LEN:
             return jsonify({"error": f"field '{field}' exceeds {MAX_FIELD_LEN} bytes"}), 400
+
+    # W2: Reject oversized values for short string fields before the ORM sees
+    # them — SQLite silently truncates; PostgreSQL raises DataError (500).
+    _SHORT_FIELD_LENGTHS = {
+        "host": 64, "event_type": 64, "user": 128,
+        "src_ip": 45, "dest_ip": 45, "process_name": 256,
+    }
+    for field, max_len in _SHORT_FIELD_LENGTHS.items():
+        val = data.get(field)
+        if val is not None and len(str(val)) > max_len:
+            return jsonify({"error": f"field '{field}' exceeds {max_len} characters"}), 400
 
     for field in REQUIRED_FIELDS:
         if field not in data:
@@ -85,6 +97,12 @@ def ingest_event():
     # time-window filtering.
     if timestamp.tzinfo is not None:
         timestamp = timestamp.astimezone(timezone.utc).replace(tzinfo=None)
+
+    # W12: details must be a JSON object; a list or scalar would cause
+    # AttributeError when the engine or templates call .get() on it.
+    details = data.get("details")
+    if details is not None and not isinstance(details, dict):
+        return jsonify({"error": "field 'details' must be a JSON object"}), 400
 
     src_ip = data.get("src_ip")
     event = Event(

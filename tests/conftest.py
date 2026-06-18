@@ -27,7 +27,11 @@ def client(app):
     dashboard routes need a session; the few that test the auth flow itself use
     anon_client instead."""
     client = app.test_client()
-    client.post("/login", data={"username": "admin", "password": "secret"})
+    # T14: Assert login succeeded so a regression in the auth route surfaces
+    # here rather than as a confusing redirect in every downstream test.
+    resp = client.post("/login", data={"username": "admin", "password": "secret"},
+                       follow_redirects=False)
+    assert resp.status_code == 302, f"fixture login failed (status {resp.status_code})"
     return client
 
 

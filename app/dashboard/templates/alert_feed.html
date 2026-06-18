@@ -192,13 +192,19 @@
         var html = '';
         data.alerts.forEach(function (a) {
             var isNew = !existingIds.has(String(a.id));
-            html += '<tr class="row-link' + (isNew ? ' row-enter' : '') + '" data-id="' + a.id + '" data-href="' + a.url + '">' +
-                '<td class="mono">' + a.created_at + '</td>' +
-                '<td><span class="badge-pill badge-' + a.severity + '">' + a.severity + '</span></td>' +
-                '<td><a href="' + a.url + '">' + escapeHtml(a.title) + '</a></td>' +
+            // W1: escape every API-sourced field injected into innerHTML.
+            var eid   = escapeHtml(String(a.id));
+            var eurl  = escapeHtml(a.url);
+            var ecat  = escapeHtml(a.created_at);
+            var esev  = escapeHtml(a.severity);
+            var estat = escapeHtml(a.status);
+            html += '<tr class="row-link' + (isNew ? ' row-enter' : '') + '" data-id="' + eid + '" data-href="' + eurl + '">' +
+                '<td class="mono">' + ecat + '</td>' +
+                '<td><span class="badge-pill badge-' + esev + '">' + esev + '</span></td>' +
+                '<td><a href="' + eurl + '">' + escapeHtml(a.title) + '</a></td>' +
                 '<td class="mono">' + escapeHtml(a.attack_technique) + '</td>' +
                 '<td>' + escapeHtml(a.host) + '</td>' +
-                '<td><span class="badge-pill badge-status-' + a.status + '">' + (statusLabel[a.status] || a.status) + '</span></td>' +
+                '<td><span class="badge-pill badge-status-' + estat + '">' + (statusLabel[a.status] || estat) + '</span></td>' +
                 '</tr>';
         });
         tbody.innerHTML = html || '<tr class="empty-row"><td colspan="6">No alerts yet — start a telemetry feed above to begin generating detections.</td></tr>';
