@@ -95,11 +95,16 @@ compose will refuse to start without them; generate values with
 
    Database tables are created automatically on first start.
 
-6. **Create the admin login** (see [Dashboard login](#dashboard-login) below
-   for details):
+6. **Start the app and log in** — `python run.py` automatically seeds the
+   admin account (`admin` / `demo`) on startup, so you can log in immediately.
+   No separate command needed for local dev.
+
+   To set a custom password, set `ADMIN_PASSWORD` before starting:
 
    ```bash
-   flask --app run create-admin --username admin
+   # Windows PowerShell
+   $env:ADMIN_PASSWORD = "mypassword"
+   python run.py
    ```
 
 7. **(Optional) seed demo data** so the dashboard has something to show:
@@ -108,25 +113,28 @@ compose will refuse to start without them; generate values with
    python scripts/seed_demo_data.py
    ```
 
-8. **Open the dashboard** at http://localhost:5000 and log in with the
-   credentials from step 6 (or `admin` / `demo` if you used the seed script's
-   default).
+8. **Open the dashboard** at http://localhost:5000 and log in with
+   `admin` / `demo` (or whatever you set `ADMIN_PASSWORD` to).
 
 ## Dashboard login
 
 The dashboard is gated behind a login page (Flask-Login) — there is no
 public signup. The single admin account is stored in the database with a
-hashed password and is created/updated via a Flask CLI command:
+hashed password.
+
+**Local dev:** `python run.py` automatically seeds `admin` / `demo` on every
+start, so no setup is needed. Set `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars
+to override the defaults.
+
+**docker-compose / production:** the `create-admin` CLI command is used instead
+(run automatically by docker-compose on container start via `ADMIN_PASSWORD`
+from `.env`):
 
 ```bash
 flask --app run create-admin --username admin
 ```
 
-(omit `--password` to be prompted interactively, or set `ADMIN_USERNAME` /
-`ADMIN_PASSWORD` env vars to run it non-interactively, as `docker-compose.yml`
-does on startup). `scripts/seed_demo_data.py` also seeds a demo admin
-(`admin` / `demo` by default, override with `ADMIN_USERNAME`/
-`ADMIN_PASSWORD`) so the live demo has working credentials out of the box.
+Omit `--password` to be prompted interactively.
 
 ## Generating demo data
 
