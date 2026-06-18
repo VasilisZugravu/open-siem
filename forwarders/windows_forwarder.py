@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 SIEM_URL = os.environ.get("SIEM_URL", "http://localhost:5000")
-SIEM_API_KEY = os.environ.get("SIEM_API_KEY", "")
+SIEM_API_KEY = os.environ.get("SIEM_API_KEY") or os.environ.get("INGEST_API_KEY", "")
 POLL_INTERVAL = float(os.environ.get("SIEM_POLL_INTERVAL", "2"))
 STATE_FILE = os.environ.get(
     "SIEM_STATE_FILE",

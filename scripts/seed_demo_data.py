@@ -6,7 +6,7 @@ import requests
 BASE_URL = "http://localhost:5000"
 # Same env var the live forwarders read (forwarders/*.py) — lets this script
 # authenticate against a SIEM that requires INGEST_API_KEY, same as them.
-API_KEY = os.environ.get("SIEM_API_KEY", "")
+API_KEY = os.environ.get("SIEM_API_KEY") or os.environ.get("INGEST_API_KEY", "")
 
 
 def post_event(base_url, event):

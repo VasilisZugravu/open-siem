@@ -75,6 +75,11 @@ compose will refuse to start without them; generate values with
    isolated lab box), set `ALLOW_UNAUTHENTICATED_INGEST=1` instead of
    `INGEST_API_KEY` — but then anyone who can reach the app can inject events.
 
+   The bundled forwarders and scripts (`forwarders/*.py`, `scripts/replay_dataset.py`,
+   `scripts/simulate_traffic.py`, `scripts/seed_demo_data.py`) read `SIEM_API_KEY`
+   first, then fall back to `INGEST_API_KEY`. Setting only `INGEST_API_KEY` is
+   sufficient — they will pick it up automatically via the fallback.
+
 4. **(Optional) point at Postgres instead of SQLite** — by default the app
    uses a local SQLite file (`siem.db`); skip this step to just use that:
 

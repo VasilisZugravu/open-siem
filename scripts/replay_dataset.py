@@ -35,7 +35,7 @@ DEFAULT_AUTH_LOG_URL = "https://raw.githubusercontent.com/logpai/loghub/master/O
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 # Same env var the live forwarders read (forwarders/*.py) — lets this script
 # authenticate against a SIEM that requires INGEST_API_KEY, same as them.
-API_KEY = os.environ.get("SIEM_API_KEY", "")
+API_KEY = os.environ.get("SIEM_API_KEY") or os.environ.get("INGEST_API_KEY", "")
 
 PARSERS = {
     "auth": parse_auth_log_line,
