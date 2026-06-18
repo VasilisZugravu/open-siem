@@ -30,6 +30,24 @@ dashboard with an ATT&CK coverage heatmap.
    [PostgreSQL] (events, alerts, engine_state tables)
 ```
 
+## Quick start (local dev — zero config)
+
+```bash
+git clone <this-repo>
+cd <this-repo>
+python -m venv venv
+venv\Scripts\activate        # Linux/macOS: source venv/bin/activate
+pip install -r requirements.txt
+python run.py
+```
+
+Open http://localhost:5000 and log in with **`admin` / `demo`**.
+
+That's it. `run.py` sets dev-safe secret defaults and auto-seeds the admin
+account on every start — no environment variables needed for local dev.
+
+---
+
 ## Running with Docker Compose
 
 ```bash
@@ -42,79 +60,56 @@ This starts:
 - `app` — the Flask app at http://localhost:5000
 
 Database tables are created automatically on first start. `.env` is
-gitignored — `SECRET_KEY` and `INGEST_API_KEY` have no built-in default and
-compose will refuse to start without them; generate values with
+gitignored — generate secret values with
 `python -c "import secrets; print(secrets.token_hex(32))"`.
 
-## Running locally without Docker (step by step)
+## Running locally without Docker (full options)
 
-1. **Clone and enter the repo, then create a virtualenv:**
+1. **Create and activate a virtualenv:**
 
    ```bash
    python -m venv venv
    source venv/bin/activate        # Windows: venv\Scripts\activate
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Set the required secrets** — `SECRET_KEY` (Flask session signing) and
-   `INGEST_API_KEY` (auth for `/ingest` and `/api/alerts`) have no built-in
-   default and the app refuses to start without them:
+2. **(Production only) set secrets** — `run.py` provides dev-safe defaults
+   when run directly, so this step is only needed for production or gunicorn:
 
    ```bash
    export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
    export INGEST_API_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
    ```
 
-   (Windows PowerShell: `$env:SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"`,
-   same for `INGEST_API_KEY`.) To leave `/ingest` open with no key (e.g. an
-   isolated lab box), set `ALLOW_UNAUTHENTICATED_INGEST=1` instead of
-   `INGEST_API_KEY` — but then anyone who can reach the app can inject events.
+   Windows PowerShell: `$env:SECRET_KEY = $(python -c "import secrets; print(secrets.token_hex(32))")`
 
-   The bundled forwarders and scripts (`forwarders/*.py`, `scripts/replay_dataset.py`,
-   `scripts/simulate_traffic.py`, `scripts/seed_demo_data.py`) read `SIEM_API_KEY`
-   first, then fall back to `INGEST_API_KEY`. Setting only `INGEST_API_KEY` is
-   sufficient — they will pick it up automatically via the fallback.
+   To open `/ingest` with no auth (isolated lab box only), set
+   `ALLOW_UNAUTHENTICATED_INGEST=1` instead. The bundled forwarders and
+   scripts read `SIEM_API_KEY` first, then fall back to `INGEST_API_KEY`.
 
-4. **(Optional) point at Postgres instead of SQLite** — by default the app
-   uses a local SQLite file (`siem.db`); skip this step to just use that:
+3. **(Optional) point at Postgres instead of SQLite:**
 
    ```bash
    export DATABASE_URL=postgresql://siem:siem@localhost:5432/siem
    ```
 
-5. **Start the app:**
+4. **Start the app:**
 
    ```bash
    python run.py
    ```
 
-   Database tables are created automatically on first start.
+   Tables are created on first start. The admin account (`admin` / `demo`) is
+   seeded automatically — set `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars to
+   override.
 
-6. **Start the app and log in** — `python run.py` automatically seeds the
-   admin account (`admin` / `demo`) on startup, so you can log in immediately.
-   No separate command needed for local dev.
-
-   To set a custom password, set `ADMIN_PASSWORD` before starting:
-
-   ```bash
-   # Windows PowerShell
-   $env:ADMIN_PASSWORD = "mypassword"
-   python run.py
-   ```
-
-7. **(Optional) seed demo data** so the dashboard has something to show:
+5. **(Optional) seed demo data** so the dashboard has something to show:
 
    ```bash
    python scripts/seed_demo_data.py
    ```
 
-8. **Open the dashboard** at http://localhost:5000 and log in with
-   `admin` / `demo` (or whatever you set `ADMIN_PASSWORD` to).
+6. **Open** http://localhost:5000 and log in with `admin` / `demo`.
 
 ## Dashboard login
 
