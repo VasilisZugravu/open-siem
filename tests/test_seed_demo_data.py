@@ -84,6 +84,8 @@ def test_seed_demo_admin_does_not_start_scheduler(monkeypatch):
     # server it's seeding alongside would already have set.
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("ALLOW_UNAUTHENTICATED_INGEST", "1")
+    # ADMIN_PASSWORD must be set — seed_demo_admin() exits if it is missing.
+    monkeypatch.setenv("ADMIN_PASSWORD", "test-password-for-scheduler-test")
 
     captured = {}
     real_create_app = app_module.create_app

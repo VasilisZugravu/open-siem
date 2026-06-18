@@ -67,7 +67,11 @@ def parse_events(lines, source):
     parser = PARSERS[source]
     events = []
     for line in lines:
-        event = parser(line)
+        try:
+            event = parser(line)
+        except Exception as exc:
+            print(f"[warn] Skipping malformed line: {exc}")
+            continue
         if event is not None:
             events.append(event)
     return events

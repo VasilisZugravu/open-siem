@@ -176,13 +176,25 @@ def build_demo_events():
 
 def seed_demo_admin():
     """Ensure a demo admin account exists so the live demo has working
-    credentials without a manual `flask create-admin` step."""
+    credentials without a manual `flask create-admin` step.
+
+    ADMIN_PASSWORD must be set in the environment — this script will exit
+    rather than create an account with a known default password.
+    ADMIN_USERNAME defaults to 'admin' if not set.
+    """
+    import sys
     import os
     from app import create_app
     from app.cli import ensure_admin
 
     username = os.environ.get("ADMIN_USERNAME", "admin")
-    password = os.environ.get("ADMIN_PASSWORD", "demo")
+    password = os.environ.get("ADMIN_PASSWORD")
+    if not password:
+        print(
+            "ADMIN_PASSWORD is not set. Set it in the environment to seed a demo admin, "
+            "or this script will exit to avoid creating an account with a known password."
+        )
+        sys.exit(1)
     # Don't start a second background scheduler thread — the live server
     # (or another seed run) already has one running against this DB.
     app = create_app({"START_SCHEDULER": False})

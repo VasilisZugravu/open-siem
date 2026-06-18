@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import socket
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -101,8 +102,11 @@ def load_state():
 
 
 def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
+    dir_ = os.path.dirname(STATE_FILE) or "."
+    with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp") as tmp:
+        json.dump(state, tmp)
+        tmp_path = tmp.name
+    os.replace(tmp_path, STATE_FILE)
 
 
 def post_event(event):

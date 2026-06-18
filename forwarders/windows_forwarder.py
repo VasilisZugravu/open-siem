@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import socket
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -85,8 +86,11 @@ def load_state():
 
 
 def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
+    dir_ = os.path.dirname(STATE_FILE) or "."
+    with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp") as tmp:
+        json.dump(state, tmp)
+        tmp_path = tmp.name
+    os.replace(tmp_path, STATE_FILE)
 
 
 def post_event(event):
@@ -144,7 +148,13 @@ def main():
 
     while True:
         for record_id, xml_string in _get_new_events(state["last_record_id"]):
-            event = map_sysmon_event(xml_string)
+            try:
+                event = map_sysmon_event(xml_string)
+            except Exception as exc:
+                logger.warning("Failed to parse Sysmon event (record %s): %s — skipping", record_id, exc)
+                state["last_record_id"] = record_id
+                save_state(state)
+                continue
             if event is not None:
                 if not post_event(event):
                     break
