@@ -6,7 +6,7 @@ import os
 # skipped, leaving the production RuntimeError guards intact.
 if __name__ == "__main__":
     os.environ.setdefault("SECRET_KEY", "dev-secret-not-for-production")
-    os.environ.setdefault("INGEST_API_KEY", "dev-api-key")
+    # ponytail: no INGEST_API_KEY default — ingest is open for local dev (check skips when key is unset)
 
 from app import create_app
 from app.cli import ensure_admin
