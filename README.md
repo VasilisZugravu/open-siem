@@ -50,20 +50,27 @@ account on every start — no environment variables needed for local dev.
 
 ## Running with Docker Compose
 
-```bash
-cp .env.example .env   # fill in SECRET_KEY, INGEST_API_KEY, ADMIN_PASSWORD, POSTGRES_PASSWORD
-docker-compose up --build
+**One-time setup** (do this once from a terminal in the repo folder):
+
+```powershell
+docker compose up -d
 ```
 
-This starts:
-- `db` — PostgreSQL 16
-- `app` — the Flask app at http://localhost:5000
+This builds the image, starts PostgreSQL and the Flask app, and creates all
+database tables. Open http://localhost:5000 and log in with `admin` and the
+`ADMIN_PASSWORD` from your `.env`.
 
-Database tables are created automatically on first start. `.env` is
-gitignored — generate secret values with
+**Every time after that** — use Docker Desktop. Open the **Containers** tab,
+find the `cyber` stack, and click ▶ / ■ to start or stop. No terminal needed.
+
+> **Why not "Run" the image from Docker Desktop directly?** The Run button
+> doesn't load `docker-compose.yml` or `.env`, so env vars like `SECRET_KEY`
+> are missing and the app crashes. Always use `docker compose up -d` or the
+> Containers tab (which remembers the compose config).
+
+`.env` is gitignored — generate secret values with
 `python -c "import secrets; print(secrets.token_hex(32))"`.
-
-Log in with `admin` and the **`ADMIN_PASSWORD`** you set in `.env` (not the default `demo` — that only applies to `python run.py`).
+See [DOCKER.md](DOCKER.md) for a full walkthrough.
 
 ## Running locally without Docker (full options)
 
