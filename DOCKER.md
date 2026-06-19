@@ -319,16 +319,15 @@ The fix is simple and matches how real SIEMs work: run the forwarder **on
 Windows**, posting to the container's published port. The Docker container
 stays as the backend; the forwarder is a lightweight agent on the host.
 
-### Path A — process + network monitoring (zero setup, works now)
+### Path A — process + network monitoring (easiest, works now)
 
-In a **second terminal**, while `docker compose up -d` is already running:
+While `docker compose up -d` is already running:
 
-```powershell
-.\run-monitor.ps1
-```
+1. Click **"Download run-monitor.bat"** on the Machine Monitor row in the dashboard.
+2. Save the file to the **repo root** (`C:\...\Cyber\`).
+3. **Double-click** `run-monitor.bat`.
 
-The script reads your `.env` automatically, so you don't need to type the API
-key. You'll see:
+A console window opens showing:
 
 ```
 Monitoring YOURPC -> http://localhost:5000   (Ctrl+C to stop)
@@ -337,8 +336,14 @@ Monitoring YOURPC -> http://localhost:5000   (Ctrl+C to stop)
 2026-06-19 12:06:16 INFO sent network_connection: chrome.exe outbound ... -> 142.250.80.46:443
 ```
 
-Events appear in the dashboard within ~2 seconds of anything happening on
-your machine. Press **Ctrl+C** to stop.
+Events appear in the dashboard within ~2 seconds. Close the window (or press
+Ctrl+C inside it) to stop.
+
+Alternatively, run the PowerShell script directly from the repo:
+
+```powershell
+.\run-monitor.ps1
+```
 
 ### Path B — Sysmon Event Log monitoring (optional, richer telemetry)
 

@@ -48,7 +48,9 @@
                 <div class="feed-desc">{{ feed.description }}</div>
             </div>
             <div>
-                {% if feed_status[name] %}
+                {% if name == 'machine' and in_docker %}
+                <a href="{{ url_for('dashboard.monitor_script') }}" class="btn btn-outline-success btn-sm" title="Save to your SIEM repo folder, then double-click to start monitoring">Download run-monitor.bat</a>
+                {% elif feed_status[name] %}
                 <form method="post" action="{{ url_for('dashboard.stop_feed', name=name) }}" class="d-inline" data-loading-btn>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm">Stop</button>

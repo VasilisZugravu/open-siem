@@ -203,6 +203,13 @@ whichever feed(s) you want, e.g. just Machine Monitor to watch this PC, or
 add Real Incident Logs/Synthetic Traffic on top to also exercise the rest of
 the rule set.
 
+**Running under Docker:** the Machine Monitor button becomes **"Download
+run-monitor.bat"**. Docker containers run in a Linux VM and cannot access
+the Windows process table, so the forwarder must run on the host instead.
+Click the button, save `run-monitor.bat` to the repo root, and double-click
+it — it reads your `.env` automatically and posts events to the container's
+published port.
+
 ## Attack Lab
 
 Nine attack simulation scripts (bash for Linux, PowerShell for Windows) each

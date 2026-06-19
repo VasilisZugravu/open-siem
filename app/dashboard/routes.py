@@ -1,14 +1,14 @@
 import secrets
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app, session
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app, session, send_file
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import to_athens_time
 from app._rate_limit import is_rate_limited, record_request, clear as rl_clear
 from app.db import db
-from app.feeds import FEEDS, feed_manager
+from app.feeds import FEEDS, feed_manager, IN_DOCKER
 from app.models import Alert, Event, User
 from app.detection.rules_loader import RULES_DIR, load_rules
 
@@ -105,6 +105,7 @@ def alert_feed():
         feeds=FEEDS,
         feed_status=data["feed_status"],
         metrics=data["metrics"],
+        in_docker=IN_DOCKER,
     )
 
 
@@ -310,6 +311,15 @@ def event_explorer():
         selected_event_type=event_type or "",
         search=search or "",
     )
+
+
+@dashboard_bp.route("/monitor-script")
+@login_required
+def monitor_script():
+    import pathlib
+    script = pathlib.Path(current_app.root_path).parent / "run-monitor.bat"
+    return send_file(script, as_attachment=True, download_name="run-monitor.bat",
+                     mimetype="text/plain")
 
 
 @dashboard_bp.route("/login", methods=["GET", "POST"])

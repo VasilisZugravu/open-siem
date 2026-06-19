@@ -19,6 +19,9 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# ponytail: /.dockerenv is created by Docker on container start — reliable enough
+IN_DOCKER = os.path.exists("/.dockerenv")
+
 FEEDS = {
     "machine": {
         "label": "Machine Monitor",
