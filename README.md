@@ -240,6 +240,9 @@ Sysmon config, forwarder prerequisites, host-only network, `validate.py` usage).
   "fired" once it has produced at least one alert
 - `/events` — Event Explorer: filter raw ingested events by host, event type,
   or free-text search; shows direction and mock country · AS for public source IPs
+- `/attack` — Attack Simulator: 12 selectable scenario cards that inject synthetic
+  attack events on demand, each mirroring real attack telemetry and triggering the
+  matching detection rule within ~30 s
 
 ## Screenshots
 
@@ -262,6 +265,10 @@ Sysmon config, forwarder prerequisites, host-only network, `validate.py` usage).
 **Alert detail** — rule metadata, triggering events, triage status dropdown, and analyst notes
 
 ![Alert detail](docs/img/alert-detail.png)
+
+**Attack Simulator** — 12 selectable scenario cards, each firing a synthetic event that triggers the matching detection rule
+
+![Attack Simulator](docs/img/attack-simulator.png)
 
 ## Detection coverage
 
