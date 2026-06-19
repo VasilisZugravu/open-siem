@@ -1,6 +1,9 @@
 # Attack Lab Coverage
 
-Last validated: (not yet run)
+> ⚠️ **STATUS: PLANNED / NOT IMPLEMENTED.** This VM live-run has not been executed.
+> See the dashboard Attack Simulator for the implemented demo path.
+
+Last validated: (not yet run — VM lab is future work)
 
 | # | Scenario | VM | ATT&CK | Rule | Result |
 |---|----------|-----|--------|------|--------|

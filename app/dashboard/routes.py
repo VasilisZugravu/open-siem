@@ -1,4 +1,7 @@
+import os
 import secrets
+import subprocess
+import sys
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash, current_app, session, send_file
@@ -11,6 +14,10 @@ from app.db import db
 from app.feeds import FEEDS, feed_manager, IN_DOCKER
 from app.models import Alert, Event, User
 from app.detection.rules_loader import RULES_DIR, load_rules
+from scripts.simulate_traffic import SCENARIO_META
+
+# ponytail: BASE_DIR mirrors app/feeds.py — one-shot Popen reuses the same proven subprocess path.
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 dashboard_bp = Blueprint(
     "dashboard", __name__,
@@ -107,6 +114,43 @@ def alert_feed():
         metrics=data["metrics"],
         in_docker=IN_DOCKER,
     )
+
+
+@dashboard_bp.route("/attack")
+@login_required
+def attack_simulator():
+    return render_template(
+        "attack_simulator.html",
+        scenarios=list(enumerate(SCENARIO_META, start=1)),
+    )
+
+
+@dashboard_bp.route("/lab/fire", methods=["POST"])
+@login_required
+def fire_scenario():
+    selected = request.form.getlist("scenario")
+    if not selected:
+        flash("Select at least one scenario.")
+        return redirect(url_for("dashboard.attack_simulator"))
+    env = os.environ.copy()
+    env["PYTHONPATH"] = BASE_DIR
+    fired = []
+    for s in selected:
+        try:
+            n = int(s)
+        except ValueError:
+            continue
+        if not 1 <= n <= len(SCENARIO_META):
+            continue
+        subprocess.Popen(
+            [sys.executable, "scripts/simulate_traffic.py", "--once", "--scenario", str(n)],
+            cwd=BASE_DIR,
+            env=env,
+        )
+        fired.append(SCENARIO_META[n - 1][0])
+    if fired:
+        flash(f"Fired: {', '.join(fired)} — alerts should appear within ~30 s.")
+    return redirect(url_for("dashboard.attack_simulator"))
 
 
 @dashboard_bp.route("/api/feed")

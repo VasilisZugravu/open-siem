@@ -15,19 +15,13 @@ dashboard with an ATT&CK coverage heatmap.
 ## Architecture
 
 ```
-[Attack Lab: Windows VM (Sysmon) + Linux VM] --(attack scripts)-->
-        |
-        v
-[Log Forwarders] --(POST normalized JSON)-->
-        |
-        v
-   [Flask App]
-     - /ingest endpoint (forwarders POST events here)
-     - Detection Engine (background loop every ~30s, YAML rules, ATT&CK-tagged)
-     - Dashboard UI (alert feed, alert detail, ATT&CK heatmap, event explorer, charts)
-        |
-        v
-   [PostgreSQL] (events, alerts, engine_state tables)
+[Attack Simulator (dashboard)] --(synthetic events)-->  \
+[Machine Monitor / Incident Replay / Synthetic feeds]  --> [Flask App]
+[Attack Lab: VM + Sysmon + forwarders (future work)]  /      - /ingest endpoint
+                                                               - Detection Engine (~30s loop, YAML rules, ATT&CK-tagged)
+                                                               - Dashboard UI (alerts, heatmap, event explorer)
+                                                                    |
+                                                               [SQLite / PostgreSQL]
 ```
 
 ## Quick start (local dev — zero config)
@@ -146,8 +140,13 @@ Omit `--password` to be prompted interactively.
 
 ## Generating demo data
 
-The quickest way is the **Synthetic Traffic** feed on the dashboard (no CLI
-needed) — click **Start** next to it and alerts will appear within ~30 seconds.
+The quickest way is the **Attack Simulator** panel on the dashboard — 12 buttons, one
+per scenario. Click any button and the matching alert appears within ~30 seconds. No
+forwarder or VM needed; each button injects the synthetic event that the real attack
+would have produced.
+
+For continuous background traffic, use the **Synthetic Traffic** feed — click **Start**
+next to it and a mix of benign noise plus random attacks will stream in indefinitely.
 
 To seed via CLI instead:
 
@@ -217,39 +216,17 @@ Click the button, save `run-monitor.bat` to the repo root, and double-click
 it — it reads your `.env` automatically and posts events to the container's
 published port.
 
-## Attack Lab
+## Attack Lab (future work)
 
-Nine attack simulation scripts (bash for Linux, PowerShell for Windows) each
-target one detection rule and generate real telemetry through the forwarders.
-See **[attack-lab/README.md](attack-lab/README.md)** for full setup instructions.
+`attack-lab/` contains 12 real attack scripts (bash for Linux, PowerShell for Windows)
+and a `validate.py` runner designed for a full VM-based end-to-end lab: real OS
+telemetry → Sysmon / auth.log → forwarder → SIEM → alert. This path proves the *entire
+pipeline*, including the forwarder parsing and OS capture layers that the Attack
+Simulator cannot exercise.
 
-### Forwarder setup (quick reference)
-
-**Linux VM** — tails `/var/log/auth.log` and the sudo audit log:
-
-```bash
-export SIEM_URL="http://<siem-ip>:5000"
-python forwarders/linux_forwarder.py
-```
-
-**Windows VM** — reads Sysmon Event ID 1 (process creation) and Event ID 3
-(network connection) from the Windows Event Log. Requires Sysmon installed and
-`pywin32`:
-
-```powershell
-pip install -r forwarders/requirements-windows.txt
-$env:SIEM_URL = "http://<siem-ip>:5000"
-python forwarders/windows_forwarder.py
-```
-
-After running scenarios on the VMs, validate detection coverage:
-
-```bash
-python attack-lab/validate.py --siem http://<siem-ip>:5000
-```
-
-This polls `/api/alerts` for each rule and writes results to
-[attack-lab/COVERAGE.md](attack-lab/COVERAGE.md).
+The VM lab has **not been run** — it is documented future work.
+See **[attack-lab/README.md](attack-lab/README.md)** for the full setup guide (VMs,
+Sysmon config, forwarder prerequisites, host-only network, `validate.py` usage).
 
 ## Dashboard
 

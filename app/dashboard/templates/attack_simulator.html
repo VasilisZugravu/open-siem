@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Attack Simulator{% endblock %}
+{% block head_extra %}
+<style>
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.scenario-card {
+  display: block;
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out),
+              background var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out),
+              transform var(--dur) var(--ease-out);
+  user-select: none;
+}
+.scenario-card:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-strong);
+  transform: translateY(-1px);
+}
+.scenario-card:has(.scenario-cb:checked) {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.07);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.2), 0 0 18px rgba(251, 191, 36, 0.1);
+}
+.scenario-cb {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.scenario-check {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.75rem;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.scenario-card:has(.scenario-cb:checked) .scenario-check {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.scenario-check::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #1a1000;
+  border-bottom: 2px solid #1a1000;
+  transform: rotate(-45deg) translateY(-1px);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.scenario-card:has(.scenario-cb:checked) .scenario-check::after {
+  opacity: 1;
+}
+.scenario-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  padding-right: 1.25rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+.scenario-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header" data-animate>
+    <div>
+        <h1 class="page-title">Attack Simulator</h1>
+        <p class="page-subtitle">Inject synthetic attack events — each mirrors real attack telemetry and triggers the matching rule</p>
+    </div>
+</div>
+
+<div class="panel" data-animate>
+    <div class="panel-header">
+        <span>Scenarios</span>
+        <span class="text-muted" style="font-weight:400;font-size:0.8rem;">alerts appear on the feed within ~30 s</span>
+    </div>
+    <div class="panel-body">
+        <form method="post" action="{{ url_for('dashboard.fire_scenario') }}" data-loading-btn>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="scenario-grid">
+                {% for n, (label, rule_id, technique) in scenarios %}
+                <label class="scenario-card" for="sc{{ n }}">
+                    <input class="scenario-cb" type="checkbox" name="scenario" value="{{ n }}" id="sc{{ n }}">
+                    <div class="scenario-check" aria-hidden="true"></div>
+                    <div class="scenario-name">{{ label }}</div>
+                    <div class="scenario-badges">
+                        <span class="badge-pill badge-stopped">{{ rule_id }}</span>
+                        <span class="badge-pill badge-stopped mono">{{ technique }}</span>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-warning">Fire Selected</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll('.scenario-cb').forEach(function(cb){cb.checked=true})">Select All</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll('.scenario-cb').forEach(function(cb){cb.checked=false})">Clear</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

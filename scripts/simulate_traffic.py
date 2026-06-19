@@ -107,28 +107,28 @@ def attack_ssh_bruteforce():
 
 
 def attack_sudo_shadow_edit():
-    """RULE-002 (T1548.003): sudo visudo / shadow file edit."""
+    """RULE-002 (T1548.003): sudo shadow file access — mirrors attack-lab/02 (`sudo grep root /etc/shadow`)."""
     return [{
         "timestamp": _now_iso(),
         "host": "linux-vm",
         "event_type": "command_execution",
         "user": random.choice(LINUX_USERS),
-        "command_line": random.choice(["sudo visudo", "sudo vi /etc/shadow"]),
+        "command_line": "grep root /etc/shadow",
         "details": {},
-        "raw": "privilege escalation attempt",
+        "raw": "alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/grep root /etc/shadow",
     }]
 
 
 def attack_useradd():
-    """RULE-003 (T1136.001): new local user via useradd."""
+    """RULE-003 (T1136.001): new local user — mirrors attack-lab/03 (`sudo useradd attack-lab-user`)."""
     return [{
         "timestamp": _now_iso(),
         "host": "linux-vm",
         "event_type": "command_execution",
         "user": random.choice(LINUX_USERS),
-        "command_line": f"useradd -m backdoor{random.randint(1, 999)}",
+        "command_line": "useradd attack-lab-user",
         "details": {},
-        "raw": "useradd persistence",
+        "raw": "alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/sbin/useradd attack-lab-user",
     }]
 
 
@@ -161,43 +161,43 @@ def attack_office_spawns_shell():
 
 
 def attack_scheduled_task():
-    """RULE-006 (T1053.005): schtasks.exe /create."""
+    """RULE-006 (T1053.005): schtasks.exe /create — mirrors attack-lab/06 (`AttackLabTask`)."""
     return [{
         "timestamp": _now_iso(),
         "host": "win-vm",
         "event_type": "process_creation",
         "user": random.choice(WINDOWS_USERS),
         "process_name": "schtasks.exe",
-        "command_line": "schtasks.exe /create /tn Updater /tr evil.exe /sc daily",
+        "command_line": 'schtasks /create /tn "AttackLabTask" /tr "cmd.exe" /sc once /st 00:00 /f',
         "details": {"parent_process": "cmd.exe"},
         "raw": "Sysmon Event ID 1: Process Create",
     }]
 
 
 def attack_lsass_dump():
-    """RULE-007 (T1003.001): procdump targeting lsass."""
+    """RULE-007 (T1003.001): procdump targeting lsass — mirrors attack-lab/07 (`-accepteula -ma lsass.exe`)."""
     return [{
         "timestamp": _now_iso(),
         "host": "win-vm",
         "event_type": "process_creation",
         "user": random.choice(WINDOWS_USERS),
         "process_name": "procdump.exe",
-        "command_line": "procdump.exe -ma lsass.exe lsass.dmp",
+        "command_line": "procdump.exe -accepteula -ma lsass.exe lsass.dmp",
         "details": {"parent_process": "cmd.exe"},
         "raw": "Sysmon Event ID 1: Process Create",
     }]
 
 
 def attack_c2_port():
-    """RULE-008 (T1071): outbound connection to C2 port 4444/4445."""
+    """RULE-008 (T1071): outbound connection to C2 port — mirrors attack-lab/08 (`127.0.0.1:4444`)."""
     return [{
         "timestamp": _now_iso(),
         "host": "win-vm",
         "event_type": "network_connection",
         "user": random.choice(WINDOWS_USERS),
         "process_name": "powershell.exe",
-        "dest_ip": random.choice(ATTACKER_IPS),
-        "details": {"dest_port": random.choice([4444, 4445])},
+        "dest_ip": "127.0.0.1",
+        "details": {"dest_port": 4444},
         "raw": "Sysmon Event ID 3: Network Connection",
     }]
 
@@ -285,6 +285,22 @@ ATTACK_SCENARIOS = [
     attack_certutil_decode,
 ]
 
+# Labels for dashboard buttons — (label, rule_id, attack_technique)
+SCENARIO_META = [
+    ("SSH Brute Force",                    "RULE-001", "T1110"),
+    ("Sudo Shadow Edit",                   "RULE-002", "T1548.003"),
+    ("New Local User (useradd)",           "RULE-003", "T1136.001"),
+    ("Encoded PowerShell",                 "RULE-004", "T1059.001"),
+    ("Office Spawns Shell",                "RULE-005", "T1059"),
+    ("Scheduled Task Created",             "RULE-006", "T1053.005"),
+    ("LSASS Dump via procdump",            "RULE-007", "T1003.001"),
+    ("C2 Port Connection",                 "RULE-008", "T1071"),
+    ("Brute Force → Account Creation",     "RULE-009", "T1136.001"),
+    ("LSASS Dump via comsvcs.dll",         "RULE-010", "T1003.001"),
+    ("Encoded PowerShell (evasion)",       "RULE-011", "T1059.001"),
+    ("certutil -decode",                   "RULE-012", "T1140"),
+]
+
 
 def build_tick_events(attack_prob):
     """One tick's worth of events: always some benign noise, sometimes an attack too."""
@@ -309,7 +325,25 @@ def main():
     parser.add_argument("--attack-prob", type=float, default=0.3, help="probability of an attack per tick (default 0.3)")
     parser.add_argument("--duration", type=float, default=0, help="seconds to run; 0 = run forever (default 0)")
     parser.add_argument("--url", default=BASE_URL, help=f"SIEM base URL (default {BASE_URL})")
+    parser.add_argument("--scenario", type=int, default=0, help="fire only this scenario number (1-12) then exit; requires --once")
+    parser.add_argument("--once", action="store_true", help="fire one tick/scenario and exit")
     args = parser.parse_args()
+
+    # One-shot scenario mode: used by the dashboard Attack Simulator buttons.
+    if args.scenario or args.once:
+        if args.scenario:
+            if not 1 <= args.scenario <= len(ATTACK_SCENARIOS):
+                print(f"Error: --scenario must be 1–{len(ATTACK_SCENARIOS)}")
+                sys.exit(1)
+            events = ATTACK_SCENARIOS[args.scenario - 1]()
+        else:
+            events = build_tick_events(args.attack_prob)
+        try:
+            post_events(args.url, events)
+        except requests.exceptions.RequestException as e:
+            print(f"Error: could not reach {args.url} ({e}). Is the app running? Try `python run.py` first.")
+            sys.exit(1)
+        return
 
     start = time.monotonic()
     try:

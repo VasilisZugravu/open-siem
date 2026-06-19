@@ -1,4 +1,10 @@
 
+> ⚠️ **STATUS: PLANNED / NOT IMPLEMENTED.**
+> The implemented demo path is the **Attack Simulator** on the dashboard — 12 buttons that
+> fire synthetic events covering every rule, works on localhost with no VM.
+> This VM-based lab is documented **future work** for true end-to-end validation (real OS
+> telemetry from Sysmon / auth.log through the full forwarder stack). It has not been run.
+
 # Attack Lab
 
 Twelve attack simulation scenarios — one per detection rule — that generate real
