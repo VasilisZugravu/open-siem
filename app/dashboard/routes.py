@@ -10,8 +10,7 @@ from app._rate_limit import is_rate_limited, record_request, clear as rl_clear
 from app.db import db
 from app.feeds import FEEDS, feed_manager
 from app.models import Alert, Event, User
-from app.detection import RULES_DIR
-from app.detection.rules_loader import load_rules
+from app.detection.rules_loader import RULES_DIR, load_rules
 
 dashboard_bp = Blueprint(
     "dashboard", __name__,

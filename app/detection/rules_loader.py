@@ -4,6 +4,10 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+RULES_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "rules")
+)
+
 # These are the fields checked by load_rule_file's cheap presence-guard before
 # Pydantic validation. `description` is also required by the Pydantic schema but
 # is not listed here — load_rules calls validate_rules() after this check, so a

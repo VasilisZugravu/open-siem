@@ -3,46 +3,24 @@ import re
 _regex_cache: dict[str, re.Pattern] = {}  # ponytail: process-global cache, reset on restart (fine for static YAML rules)
 
 
-def op_equals(value, expected):
-    return value == expected
-
-
-def op_contains(value, expected):
-    if not isinstance(value, str):
-        # Non-string values (int, float, bool, None) cannot contain a substring.
-        # Attempting `expected in value` on them would raise TypeError.
-        return False
-    return expected in value
-
-
-def op_regex(value, pattern):
-    if not isinstance(value, str):
-        # re.search requires a string subject; return False rather than raising TypeError.
-        return False
-    if pattern not in _regex_cache:
-        _regex_cache[pattern] = re.compile(pattern)
-    return _regex_cache[pattern].search(value) is not None
-
-
-def op_in(value, options):
-    return value in options
-
-
 def match_condition(value, condition):
-    """A condition is either a literal (equals) or a dict with one operator key."""
     if isinstance(condition, dict):
         if "contains" in condition:
-            return op_contains(value, condition["contains"])
+            return isinstance(value, str) and condition["contains"] in value
         if "regex" in condition:
-            return op_regex(value, condition["regex"])
+            if not isinstance(value, str):
+                return False
+            pat = condition["regex"]
+            if pat not in _regex_cache:
+                _regex_cache[pat] = re.compile(pat)
+            return _regex_cache[pat].search(value) is not None
         if "in" in condition:
-            return op_in(value, condition["in"])
+            return value in condition["in"]
         raise ValueError(f"Unknown operator in condition: {condition}")
-    return op_equals(value, condition)
+    return value == condition
 
 
 def match_conditions(event_dict, conditions):
-    """conditions: dict of field_name -> condition. event_dict: dict of field values."""
     for field, condition in conditions.items():
         if not match_condition(event_dict.get(field), condition):
             return False

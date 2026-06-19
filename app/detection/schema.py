@@ -118,8 +118,7 @@ def validate_rules(rules):
 
 
 if __name__ == "__main__":
-    from app.detection import RULES_DIR
-    from app.detection.rules_loader import load_rules
+    from app.detection.rules_loader import RULES_DIR, load_rules
 
     rules = load_rules(RULES_DIR)
     validate_rules(rules)

@@ -1,9 +1,8 @@
 import logging
 import threading
 import time
-from app.detection import RULES_DIR
 from app.detection.engine import run_detection_cycle
-from app.detection.rules_loader import load_rules
+from app.detection.rules_loader import RULES_DIR, load_rules
 
 logger = logging.getLogger(__name__)
 
