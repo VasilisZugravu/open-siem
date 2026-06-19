@@ -24,7 +24,7 @@ def build_demo_events():
     # Scenario 1 (RULE-001, T1110): 6 failed SSH logins from one IP within 60s
     for i in range(6):
         events.append({
-            "timestamp": (now + timedelta(seconds=i * 5)).isoformat(),
+            "timestamp": (now - timedelta(seconds=(5 - i) * 5)).isoformat(),
             "host": "linux-vm",
             "event_type": "auth_failure",
             "user": "root",
@@ -126,7 +126,7 @@ def build_demo_events():
         "raw": "Accepted password for attacker from 45.155.205.233 port 51234 ssh2",
     })
     events.append({
-        "timestamp": (now + timedelta(seconds=10)).isoformat(),
+        "timestamp": (now - timedelta(seconds=5)).isoformat(),
         "host": "linux-vm",
         "event_type": "command_execution",
         "user": "attacker",

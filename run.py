@@ -11,7 +11,7 @@ if __name__ == "__main__":
 from app import create_app
 from app.cli import ensure_admin
 
-app = create_app()
+app = create_app({"SESSION_COOKIE_SECURE": False} if __name__ == "__main__" else None)
 
 if __name__ == "__main__":
     # Dev convenience: seed admin/demo so you can log in immediately without
@@ -27,4 +27,9 @@ if __name__ == "__main__":
     # Development only: Werkzeug's built-in server is single-threaded and
     # not suitable for production. Use gunicorn or uwsgi behind a reverse
     # proxy in production (see docker-compose.yml for the compose setup).
+    import subprocess, sys
+    if os.environ.get("SIEM_START_FORWARDER") == "1":
+        env = os.environ.copy()
+        env.setdefault("PYTHONPATH", os.getcwd())
+        subprocess.Popen([sys.executable, "forwarders/windows_forwarder.py"], env=env)
     app.run(host="0.0.0.0", port=5000)

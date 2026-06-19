@@ -94,7 +94,7 @@ def attack_ssh_bruteforce():
     ip = random.choice(ATTACKER_IPS)
     return [
         {
-            "timestamp": (now + timedelta(seconds=i * 5)).isoformat(),
+            "timestamp": (now - timedelta(seconds=(5 - i) * 5)).isoformat(),
             "host": "linux-vm",
             "event_type": "auth_failure",
             "user": "root",
@@ -217,7 +217,7 @@ def attack_brute_then_persist():
             "raw": f"Accepted password for attacker from {ip} port 51234 ssh2",
         },
         {
-            "timestamp": (now + timedelta(seconds=10)).isoformat(),
+            "timestamp": (now - timedelta(seconds=5)).isoformat(),
             "host": "linux-vm",
             "event_type": "command_execution",
             "user": "attacker",
