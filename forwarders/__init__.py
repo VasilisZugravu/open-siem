@@ -25,8 +25,12 @@ def post_event(event):
 def load_state(state_file):
     if not os.path.exists(state_file):
         return {}
-    with open(state_file) as f:
-        return json.load(f)
+    try:
+        with open(state_file) as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        _logger.warning("state file %s is corrupt — resetting", state_file)
+        return {}
 
 
 def save_state(state, state_file):

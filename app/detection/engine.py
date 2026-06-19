@@ -169,7 +169,7 @@ def evaluate_aggregation_rules(rules, now=None):
                 Alert.rule_id == rule["id"],
                 Alert.created_at >= cooldown_start,
             ).all()
-            already_alerted = {a.details.get(agg["group_by"]) for a in recent_alerts}
+            already_alerted = {(a.details or {}).get(agg["group_by"]) for a in recent_alerts}
 
             for group_value, events in groups.items():
                 if len(events) < agg["threshold"]:
@@ -236,7 +236,7 @@ def evaluate_sequence_rules(rules, now=None):
                 Alert.rule_id == rule["id"],
                 Alert.created_at >= now - window,
             ).all()
-            already_alerted = {a.details.get(correlate_by) for a in recent_alerts}
+            already_alerted = {(a.details or {}).get(correlate_by) for a in recent_alerts}
 
             for e1, e1_dict in step1_matching:
                 corr_val = e1_dict.get(correlate_by)
