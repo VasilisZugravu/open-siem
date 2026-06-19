@@ -85,6 +85,7 @@ def create_app(config=None):
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
     app.jinja_env.filters["athens_time"] = to_athens_time
+    app.jinja_env.filters["omit_none"] = lambda d: {k: v for k, v in (d or {}).items() if v is not None}
 
     # Baseline hardening headers. The dashboard renders attacker-influenced
     # event data (host, command lines, etc. from /ingest); these are

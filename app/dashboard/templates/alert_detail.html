@@ -27,7 +27,7 @@
                 <dt>ATT&amp;CK Tactic</dt><dd>{{ alert.attack_tactic }}</dd>
                 <dt>Host</dt><dd>{{ alert.host }}</dd>
                 <dt>Created</dt><dd class="mono">{{ alert.created_at|athens_time }}</dd>
-                <dt>Raw Details</dt><dd><code>{{ (alert.details or {}) | tojson }}</code></dd>
+                {% set raw = alert.details | omit_none %}{% if raw %}<dt>Raw Details</dt><dd><code>{{ raw | tojson }}</code></dd>{% endif %}
             </dl>
 
             <form method="post" action="{{ url_for('dashboard.update_alert_status', alert_id=alert.id) }}" class="mb-4" data-loading-btn>

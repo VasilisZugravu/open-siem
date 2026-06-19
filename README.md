@@ -63,6 +63,8 @@ Database tables are created automatically on first start. `.env` is
 gitignored — generate secret values with
 `python -c "import secrets; print(secrets.token_hex(32))"`.
 
+Log in with `admin` and the **`ADMIN_PASSWORD`** you set in `.env` (not the default `demo` — that only applies to `python run.py`).
+
 ## Running locally without Docker (full options)
 
 1. **Create and activate a virtualenv:**
