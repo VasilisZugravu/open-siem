@@ -214,17 +214,29 @@ Run that four times and paste each output into `.env`. These are random 64-char
 hex strings. Keep the file private — it's gitignored.
 
 **Step 3 — build and start:**
-```bash
-docker compose up --build
+```powershell
+docker compose up -d
 ```
 
-What you'll see:
+What happens:
 1. Docker builds the `app` image layer by layer (slow first time, fast after)
 2. `db` starts, PostgreSQL initialises
 3. Healthcheck polls until `db` is ready
 4. `app` starts, creates the admin user, then gunicorn launches
 
+The `-d` flag runs everything in the background so you get your terminal back.
 Open http://localhost:5000 and log in with `admin` and the `ADMIN_PASSWORD` you set.
+
+**Step 4 — every time after that, use Docker Desktop.**
+Open the **Containers** tab, find the `cyber` stack, and click ▶ to start or
+■ to stop. No terminal needed after the first run — Docker Desktop remembers
+the compose config and env vars.
+
+> **Do not use the "Run" button on the image in Docker Desktop.** That button
+> starts the image in isolation without `docker-compose.yml` or `.env`, so
+> env vars like `SECRET_KEY` are missing and the app crashes with
+> `RuntimeError: SECRET_KEY is not set`. Always use the Containers tab or
+> `docker compose up -d` from the terminal.
 
 ---
 
@@ -266,6 +278,12 @@ Then open http://localhost:5000 — the dashboard should load.
 ---
 
 ## 6. Troubleshooting
+
+**`RuntimeError: SECRET_KEY is not set` on startup**
+You ran the image directly from Docker Desktop's "Images" tab using the Run
+button. That bypasses `docker-compose.yml` and `.env`, so no env vars are
+injected. Fix: use the **Containers** tab (▶ to start) or run
+`docker compose up -d` from a terminal in the repo folder.
 
 **"Cannot connect to the Docker daemon"**
 Docker Desktop isn't running. Open Docker Desktop and wait for "Engine running."
@@ -338,6 +356,12 @@ Monitoring YOURPC -> http://localhost:5000   (Ctrl+C to stop)
 
 Events appear in the dashboard within ~2 seconds. Close the window (or press
 Ctrl+C inside it) to stop.
+
+> **Note:** The Machine Monitor badge in the dashboard stays **Stopped** even
+> while the `.bat` is running — that's expected. The badge only tracks
+> subprocesses launched by the app itself (which can't work inside Docker).
+> To confirm events are flowing, open the **Events** page and watch new
+> process and network entries appear in real time.
 
 Alternatively, run the PowerShell script directly from the repo:
 
