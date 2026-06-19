@@ -40,6 +40,8 @@ class Alert(db.Model):
 
     __table_args__ = (
         db.Index("ix_alert_rule_host_status", "rule_id", "host", "status"),
+        db.CheckConstraint("status IN ('new','in_progress','closed_tp','closed_fp')", name="ck_alert_status"),
+        db.CheckConstraint("severity IN ('low','medium','high','critical')", name="ck_alert_severity"),
     )
 
 

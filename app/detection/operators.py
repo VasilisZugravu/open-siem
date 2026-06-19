@@ -1,5 +1,7 @@
 import re
 
+_regex_cache: dict[str, re.Pattern] = {}  # ponytail: process-global cache, reset on restart (fine for static YAML rules)
+
 
 def op_equals(value, expected):
     return value == expected
@@ -17,7 +19,9 @@ def op_regex(value, pattern):
     if not isinstance(value, str):
         # re.search requires a string subject; return False rather than raising TypeError.
         return False
-    return re.search(pattern, value) is not None
+    if pattern not in _regex_cache:
+        _regex_cache[pattern] = re.compile(pattern)
+    return _regex_cache[pattern].search(value) is not None
 
 
 def op_in(value, options):
