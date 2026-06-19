@@ -4,13 +4,12 @@ __pycache__/
 .env
 venv/
 
-# AI tooling config and generated docs - not part of the project
-CLAUDE.md
+# local tooling and generated output
 .claude/
+.gstack/
+.superpowers/
 graphify-out/
 docs/superpowers/
-.superpowers/
 
-# downloaded/cached third-party datasets for scripts/replay_dataset.py
+# downloaded/cached third-party datasets
 data/
-.gstack/
